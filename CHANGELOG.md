@@ -2,6 +2,18 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.22.1 (pre-release)
+
+**Fixed:**
+- `working-the-queue`: reported content must be returned verbatim by subagents — never summarised, paraphrased, or excerpted
+- `working-the-queue`: Phase 2 per-subject detail blocks now explicitly require character-for-character reproduction of reported content
+
+## skywatch-investigations 0.22.0
+
+**Changed:**
+- Verified osprey schema against live ClickHouse
+- Added missing data sources to investigation skills
+
 ## skywatch-investigations 0.21.0
 
 - `conducting-investigations`: all ClickHouse queries across 6 phases now dispatched to Sonnet subagents instead of inline `clickhouse_query`
