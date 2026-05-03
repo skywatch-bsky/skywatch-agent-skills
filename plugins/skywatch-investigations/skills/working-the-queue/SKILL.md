@@ -86,7 +86,9 @@ For each subject, dispatch a **Sonnet** subagent to gather context. Use Sonnet f
 
 > Gather moderation context for subject [DID or AT-URI]. Collect: (1) moderation history from ozone_query_events — prior reports, labels, actions, sticky comments; (2) content context — 20 most recent posts from this DID via ClickHouse osprey_execution_results with post text, timestamps, and matched rules, plus rule hits for the past 30 days grouped by rule name with counts; (3) report details — what was reported, by whom, what reason was given; (4) if the subject is a reply, thread context — the parent post, the account being replied to, and the relationship between the accounts.
 >
-> Based on what you find, return: (a) a recommended classification (label / no_action / investigate_further / escalate / defer) with a recommended label and label level if applicable; (b) the specific evidence supporting that recommendation — key posts, rule hit patterns, moderation history, thread context. Keep the summary concise — key facts and reasoning, not raw data dumps.
+> CRITICAL: Return the full verbatim text of the reported content. Do NOT summarise, paraphrase, or excerpt — reproduce it character-for-character. The analyst needs the exact original text to make moderation decisions. For replies, also return parent posts verbatim.
+>
+> Based on what you find, return: (a) the reported content verbatim; (b) a recommended classification (label / no_action / investigate_further / escalate / defer) with a recommended label and label level if applicable; (c) the specific evidence supporting that recommendation — key posts, rule hit patterns, moderation history, thread context. Keep the summary concise — key facts and reasoning, not raw data dumps.
 
 The subagent should use the data-analyst agent for ClickHouse queries and MCP tools directly for Ozone queries. The primary agent makes the final classification decision but uses the subagent's recommendation and evidence as input.
 
@@ -249,7 +251,7 @@ Present all subjects as a batch summary. Group by classification for easy scanni
 
 After the summary table, present a detail block for **every** subject (not just `label` recommendations). Each block must include:
 
-1. **The reported content itself** — the actual text of the post or content that was reported, quoted verbatim. The analyst must see exactly what was reported to verify the agent's judgment. For replies, also show the parent post(s) so the thread context is visible.
+1. **The reported content itself, verbatim** — the EXACT text of the post or content that was reported, reproduced character-for-character. NEVER summarise, paraphrase, excerpt, or editorialize reported content. The analyst must see the full original text to verify the agent's judgment. For replies, also show the parent post(s) verbatim so the thread context is visible. This is non-negotiable — a summary of reported content is useless for moderation decisions.
 2. **The agent's recommendation and reasoning** — classification, policy basis, confidence.
 3. **Key evidence** — relevant moderation history, rule hit patterns, thread context, account relationship details.
 
