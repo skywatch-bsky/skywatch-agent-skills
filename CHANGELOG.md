@@ -2,6 +2,13 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.23.3
+
+**Fixed:**
+- `working-the-queue`: summary table is now an index only — removed Key Evidence/Reasoning columns that encouraged editorialised characterisations without content
+- `working-the-queue`: detail blocks are the decision surface — must include full verbatim content (all posts reviewed with AT-URIs, profile display name and bio verbatim for account-level subjects), not summaries or samples
+- `working-the-queue`: detail blocks must present factual content BEFORE the agent's recommendation, not instead of it
+
 ## skywatch-investigations 0.23.2
 
 **Fixed:**

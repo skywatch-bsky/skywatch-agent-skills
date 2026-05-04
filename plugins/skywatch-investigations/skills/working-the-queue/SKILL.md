@@ -237,6 +237,8 @@ Present all subjects as a batch summary. Group by classification for easy scanni
 
 ### Summary Table
 
+The summary table is an index, not a decision surface. It helps the analyst navigate the batch, but decisions are made from the detail blocks below. Do NOT put editorialised characterisations in the summary — use factual descriptors only.
+
 ```
 ## Queue Triage: [entry point description]
 
@@ -245,43 +247,49 @@ Present all subjects as a batch summary. Group by classification for easy scanni
 
 ### Recommended: Label ([n])
 
-| # | Subject | Label | Level | Policy Basis | Confidence | Key Evidence |
-|---|---------|-------|-------|-------------|------------|--------------|
-| 1 | at://did:plc:.../app.bsky.feed.post/... | [label] | post | [policy] | high | [one-line summary] |
-| 2 | did:plc:... | [label] | account | [policy] | high | [one-line summary] |
+| # | Subject | Label | Level | Policy Basis | Confidence |
+|---|---------|-------|-------|-------------|------------|
+| 1 | at://did:plc:.../app.bsky.feed.post/... (handle) | [label] | post | [policy] | high |
+| 2 | did:plc:... (handle) | [label] | account | [policy] | high |
 
 ### Recommended: No Action ([n])
 
-| # | Subject | Reasoning | Confidence |
-|---|---------|-----------|------------|
-| 1 | did:plc:... | [one-line reasoning] | high |
+| # | Subject | Confidence |
+|---|---------|------------|
+| 1 | did:plc:... (handle) | high |
 
 ### Requires Decision ([n])
 
 | # | Subject | Question |
 |---|---------|----------|
-| 1 | did:plc:... | [specific question from defer classification] |
+| 1 | did:plc:... (handle) | [specific question from defer classification] |
 
 ### Recommended: Investigate Further ([n])
 
 | # | Subject | What's Unclear | Suggested Next Step |
 |---|---------|---------------|-------------------|
-| 1 | did:plc:... | [ambiguity] | [assess-account / full investigation] |
+| 1 | did:plc:... (handle) | [ambiguity] | [assess-account / full investigation] |
 
 ### Recommended: Escalate ([n])
 
 | # | Subject | Reason |
 |---|---------|--------|
-| 1 | did:plc:... | [escalation reason] |
+| 1 | did:plc:... (handle) | [escalation reason] |
 ```
 
 ### Per-Subject Detail
 
-After the summary table, present a detail block for **every** subject (not just `label` recommendations). Each block must include:
+The detail blocks are the decision surface — the analyst reads these to decide, not the summary table. Present a detail block for **every** subject (not just `label` recommendations). Each block must include:
 
-1. **The reported content itself, verbatim** — the EXACT text of the post or content that was reported, reproduced character-for-character. NEVER summarise, paraphrase, excerpt, or editorialize reported content. The analyst must see the full original text to verify the agent's judgment. For replies, also show the parent post(s) verbatim so the thread context is visible. This is non-negotiable — a summary of reported content is useless for moderation decisions.
-2. **The agent's recommendation and reasoning** — classification, policy basis, confidence.
-3. **Key evidence** — relevant moderation history, rule hit patterns, thread context, account relationship details.
+1. **Factual content the analyst can verify.** This is the most important part. The analyst cannot trust the agent's judgment without seeing what the agent saw. Provide:
+
+   - **For post-level subjects:** the EXACT text of the reported post, reproduced character-for-character. For replies, also show the parent post(s) verbatim so the thread context is visible. Include the AT-URI for each post.
+   - **For account-level subjects:** the account's display name, bio/description (verbatim), and the full text of all posts reviewed during data collection — every post, with AT-URIs. Do not sample or truncate. The analyst needs the complete evidence set to verify pattern claims. If the report concerns profile content (e.g., a blue heart emoji, impersonation, a slur in the bio), reproduce the profile fields verbatim.
+   - **NEVER summarise, paraphrase, excerpt, or editorialise content in place of showing it.** Characterisations like "right-wing reply-guy" or "combative but contextual" are not evidence — they are conclusions. Show the content, then state the conclusion separately.
+
+2. **The agent's recommendation and reasoning** — classification, policy basis, confidence. This comes AFTER the factual content, not instead of it.
+
+3. **Key evidence** — relevant moderation history, rule hit patterns, thread context, account relationship details. Include AT-URIs for all cited posts.
 
 The analyst should be able to read a detail block and make a decision without needing to go look anything up. If the reported content is an image or media that can't be displayed as text, note that and provide the AT-URI so the analyst can review it directly.
 
