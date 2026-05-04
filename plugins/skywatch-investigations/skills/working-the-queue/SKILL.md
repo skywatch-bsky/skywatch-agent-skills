@@ -290,22 +290,54 @@ The summary table is an index, not a decision surface. It helps the analyst navi
 
 ### Per-Subject Detail
 
-The detail blocks are the decision surface — the analyst reads these to decide, not the summary table. Present a detail block for **every** subject (not just `label` recommendations). Each block must include:
+The detail blocks are the decision surface — the analyst reads these to decide, not the summary table. Present a detail block for **every** subject (not just `label` recommendations).
 
-1. **Factual content the analyst can verify.** This is the most important part. The agent's role is to gather and present evidence — the analyst makes the decision. The analyst cannot trust the agent's judgment without seeing what the agent saw.
+**Do NOT invent alternative presentation formats.** No "key evidence" summary sections, no one-liner evidence lists, no collapsed characterisations. Use the template below for every subject. The template exists because previous versions of this agent replaced evidence with editorialised summaries — which is useless for moderation decisions.
 
-   Every detail block must include BOTH profile context AND post content, regardless of whether the report targets a post or an account:
+**Template (mandatory format):**
 
-   - **Profile context (always included):** the account's handle, display name, and bio/description — all reproduced verbatim. This is essential context for every subject. A post cannot be evaluated without knowing who posted it.
-   - **For post-level subjects:** the EXACT text of the reported post, reproduced character-for-character. Include the AT-URI. For replies, also show the parent post(s) verbatim with their AT-URIs so the thread context is visible.
-   - **For account-level subjects:** the full text of all posts reviewed during data collection — every post, with AT-URIs. Do not sample or truncate. The analyst needs the complete evidence set to verify pattern claims.
-   - **NEVER summarise, paraphrase, excerpt, or editorialise content in place of showing it.** Characterisations like "right-wing reply-guy" or "combative but contextual" are not evidence — they are conclusions. Show the content, then state the conclusion separately.
+```
+---
+### #[N] — [handle] ([DID])
 
-2. **The agent's recommendation and reasoning** — classification, policy basis, confidence. This comes AFTER the factual content, not instead of it. The recommendation is the agent's suggestion — the analyst decides.
+**Profile:**
+- Display Name: [verbatim]
+- Bio: [verbatim, full text]
+- Handle: [handle]
 
-3. **Supporting context** — relevant moderation history, rule hit patterns, thread context, account relationship details. Include AT-URIs for all cited posts.
+**Report:** [reporter handle] reported [post AT-URI or account DID] — reason: "[reporter's comment verbatim]"
 
-The analyst should be able to read a detail block and make a decision without needing to go look anything up. If the reported content is an image or media that can't be displayed as text, note that and provide the AT-URI so the analyst can review it directly.
+**Content Reviewed:**
+
+1. at://did:plc:.../app.bsky.feed.post/[rkey1]
+   "[full verbatim post text]"
+
+2. at://did:plc:.../app.bsky.feed.post/[rkey2]
+   "[full verbatim post text]"
+
+3. at://did:plc:.../app.bsky.feed.post/[rkey3]
+   "[full verbatim post text]"
+
+[...continue for ALL posts reviewed — do not truncate, sample, or summarise...]
+
+**Moderation History:** [prior labels, reports, actions — or "none"]
+
+**Data Sources:** [N] posts from ClickHouse, [N] posts from PDS list_records, profile from get_record
+
+**Recommendation:** [classification] — [label if applicable] at [level]
+**Policy Basis:** [policy reference]
+**Confidence:** [high/medium/low]
+**Reasoning:** [agent's reasoning — AFTER the content, not instead of it]
+---
+```
+
+Rules:
+- Every post in "Content Reviewed" must have its full AT-URI and full verbatim text. No excerpts, no "[post about X]" placeholders, no editorialisation in place of content.
+- For replies, show the parent post(s) above the reply with their AT-URIs so the thread reads top-to-bottom.
+- For images or media that can't be displayed as text, write "[image]" and provide the AT-URI so the analyst can review it directly.
+- Profile fields are always verbatim. If a field is empty, write "(none)".
+- The "Content Reviewed" section must include ALL posts the subagent reviewed, not a curated subset. If the subagent reviewed 50 posts, list all 50.
+- **NEVER summarise, paraphrase, excerpt, or editorialise content in place of showing it.** Characterisations like "right-wing reply-guy" or "combative but contextual" are not evidence — they are conclusions. The content speaks for itself.
 
 **Human in the loop:** The agent presents evidence and recommendations. The analyst makes decisions. No label is applied without the analyst's explicit confirmation. Verbose output is expected and preferred — more evidence is always better than less.
 

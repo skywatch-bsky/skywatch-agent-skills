@@ -2,6 +2,13 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.23.5
+
+**Fixed:**
+- `working-the-queue`: added mandatory detail block template with structured format — profile fields, numbered posts with AT-URIs and verbatim text, moderation history, data sources, recommendation last
+- `working-the-queue`: explicitly prohibits inventing alternative formats (e.g., "key evidence" summary sections) that replace content with editorialised characterisations
+- `working-the-queue`: all posts reviewed must be listed — no curated subsets, no truncation, no placeholders
+
 ## skywatch-investigations 0.23.4
 
 **Changed:**
