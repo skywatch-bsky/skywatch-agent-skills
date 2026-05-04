@@ -2,6 +2,13 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.23.4
+
+**Changed:**
+- `working-the-queue`: every detail block now includes both profile context AND post content regardless of report type — post reports get the account's handle/displayName/bio, account reports get all reviewed posts with AT-URIs
+- `working-the-queue`: subagent prompt now fetches profile via `get_record` as step 1 and returns all content verbatim — agent gathers evidence, analyst decides
+- `working-the-queue`: explicit human-in-the-loop principle — no label applied without analyst confirmation, verbose output preferred
+
 ## skywatch-investigations 0.23.3
 
 **Fixed:**

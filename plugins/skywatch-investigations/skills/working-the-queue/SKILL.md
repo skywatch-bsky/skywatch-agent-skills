@@ -90,13 +90,24 @@ For each subject, dispatch a **Sonnet** subagent to gather context. Use Sonnet f
 
 **Subagent prompt pattern:**
 
-> Gather moderation context for subject [DID or AT-URI]. Collect: (1) moderation history from ozone_query_events — prior reports, labels, actions, sticky comments; (2) content context — 20 most recent posts from this DID via ClickHouse osprey_execution_results with post text, timestamps, and matched rules, plus rule hits for the past 30 days grouped by rule name with counts; (3) report details — what was reported, by whom, what reason was given; (4) if the subject is a reply, thread context — the parent post, the account being replied to, and the relationship between the accounts.
+> Gather moderation context for subject [DID or AT-URI]. Collect:
+> (1) **Profile** — fetch the account's profile via `get_record` (PDSX, uri `app.bsky.actor.profile/self`, repo [DID]). Return the handle, display name, and bio/description verbatim.
+> (2) **Moderation history** — from ozone_query_events: prior reports, labels, actions, sticky comments.
+> (3) **Content context** — 20 most recent posts from this DID via ClickHouse osprey_execution_results with post text, timestamps, and matched rules, plus rule hits for the past 30 days grouped by rule name with counts.
+> (4) **Report details** — what was reported, by whom, what reason was given.
+> (5) If the subject is a reply, **thread context** — the parent post, the account being replied to, and the relationship between the accounts.
 >
 > IMPORTANT: ClickHouse only covers ~2 months of data. If ClickHouse returns fewer than 20 posts, you MUST also fetch posts directly from the account's PDS using the `list_records` PDSX tool with collection `app.bsky.feed.post` and the subject's DID as `repo`. Paginate with limit 25 and use the cursor to fetch multiple pages — aim for at least 50 posts or until you run out of content. This is essential for accounts that pre-date the ClickHouse window or have sparse recent activity.
 >
-> CRITICAL: Return the full verbatim text of the reported content. Do NOT summarise, paraphrase, or excerpt — reproduce it character-for-character. The analyst needs the exact original text to make moderation decisions. For replies, also return parent posts verbatim.
+> CRITICAL: Return ALL content verbatim. Do NOT summarise, paraphrase, or excerpt. The analyst reviews the evidence and makes the decision — the agent's role is to gather and present, not to judge. Specifically return:
+> (a) The account's handle, display name, and bio/description — verbatim.
+> (b) The reported content verbatim (for post-level subjects). For replies, also return parent posts verbatim.
+> (c) The full text of every post reviewed, with AT-URIs and timestamps.
+> (d) A recommended classification (label / no_action / investigate_further / escalate / defer) with a recommended label and label level if applicable.
+> (e) The specific evidence supporting that recommendation — rule hit patterns, moderation history, thread context.
+> (f) Whether content was sourced from ClickHouse, PDS list_records, or both — and how many posts were reviewed from each source.
 >
-> Based on what you find, return: (a) the reported content verbatim; (b) a recommended classification (label / no_action / investigate_further / escalate / defer) with a recommended label and label level if applicable; (c) the specific evidence supporting that recommendation — key posts, rule hit patterns, moderation history, thread context; (d) whether content was sourced from ClickHouse, PDS list_records, or both — and how many posts were reviewed from each source. Keep the summary concise — key facts and reasoning, not raw data dumps.
+> Be verbose. More evidence is always better than less.
 
 The subagent should use the data-analyst agent for ClickHouse queries, the `list_records` PDSX tool directly for PDS record fetching, and MCP tools directly for Ozone queries. The primary agent makes the final classification decision but uses the subagent's recommendation and evidence as input.
 
@@ -281,17 +292,22 @@ The summary table is an index, not a decision surface. It helps the analyst navi
 
 The detail blocks are the decision surface — the analyst reads these to decide, not the summary table. Present a detail block for **every** subject (not just `label` recommendations). Each block must include:
 
-1. **Factual content the analyst can verify.** This is the most important part. The analyst cannot trust the agent's judgment without seeing what the agent saw. Provide:
+1. **Factual content the analyst can verify.** This is the most important part. The agent's role is to gather and present evidence — the analyst makes the decision. The analyst cannot trust the agent's judgment without seeing what the agent saw.
 
-   - **For post-level subjects:** the EXACT text of the reported post, reproduced character-for-character. For replies, also show the parent post(s) verbatim so the thread context is visible. Include the AT-URI for each post.
-   - **For account-level subjects:** the account's display name, bio/description (verbatim), and the full text of all posts reviewed during data collection — every post, with AT-URIs. Do not sample or truncate. The analyst needs the complete evidence set to verify pattern claims. If the report concerns profile content (e.g., a blue heart emoji, impersonation, a slur in the bio), reproduce the profile fields verbatim.
+   Every detail block must include BOTH profile context AND post content, regardless of whether the report targets a post or an account:
+
+   - **Profile context (always included):** the account's handle, display name, and bio/description — all reproduced verbatim. This is essential context for every subject. A post cannot be evaluated without knowing who posted it.
+   - **For post-level subjects:** the EXACT text of the reported post, reproduced character-for-character. Include the AT-URI. For replies, also show the parent post(s) verbatim with their AT-URIs so the thread context is visible.
+   - **For account-level subjects:** the full text of all posts reviewed during data collection — every post, with AT-URIs. Do not sample or truncate. The analyst needs the complete evidence set to verify pattern claims.
    - **NEVER summarise, paraphrase, excerpt, or editorialise content in place of showing it.** Characterisations like "right-wing reply-guy" or "combative but contextual" are not evidence — they are conclusions. Show the content, then state the conclusion separately.
 
-2. **The agent's recommendation and reasoning** — classification, policy basis, confidence. This comes AFTER the factual content, not instead of it.
+2. **The agent's recommendation and reasoning** — classification, policy basis, confidence. This comes AFTER the factual content, not instead of it. The recommendation is the agent's suggestion — the analyst decides.
 
-3. **Key evidence** — relevant moderation history, rule hit patterns, thread context, account relationship details. Include AT-URIs for all cited posts.
+3. **Supporting context** — relevant moderation history, rule hit patterns, thread context, account relationship details. Include AT-URIs for all cited posts.
 
 The analyst should be able to read a detail block and make a decision without needing to go look anything up. If the reported content is an image or media that can't be displayed as text, note that and provide the AT-URI so the analyst can review it directly.
+
+**Human in the loop:** The agent presents evidence and recommendations. The analyst makes decisions. No label is applied without the analyst's explicit confirmation. Verbose output is expected and preferred — more evidence is always better than less.
 
 **Then wait for user direction.** Do not proceed to Phase 3 until the user confirms, modifies, or overrides the recommendations.
 
