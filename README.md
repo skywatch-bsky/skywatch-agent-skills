@@ -1,6 +1,6 @@
 # skywatch-skills
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin marketplace for investigating coordinated behaviour on the AT Protocol network, authoring Osprey SML moderation rules, and managing Ozone queues. Built and maintained by [Skywatch Blue](https://github.com/skywatch-bsky).
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugins for AT Protocol moderation — investigate coordinated behaviour, author Osprey SML rules, and manage Ozone queues. Built and maintained by [Skywatch Blue](https://github.com/skywatch-bsky).
 
 ## Plugins
 
@@ -85,7 +85,7 @@ The entry point agent (`osprey-rule-writer`) dispatches specialized subagents ba
 
 ## osprey-rule-investigator
 
-Read-only analysis agent for Osprey SML rule projects — produces structured text reports covering project structure, labels, models, UDFs, and execution graphs without modifying any files.
+Analyses Osprey SML rule projects and reports on structure, labels, models, UDFs, and execution graphs. Read-only — changes nothing.
 
 Used as a subagent by `osprey-rules` for project state discovery, but can also be invoked standalone.
 
@@ -94,7 +94,7 @@ Used as a subagent by `osprey-rules` for project state discovery, but can also b
 - Project structure inventory (files, labels, models)
 - UDF discovery (dynamic from Python source, static fallback)
 - Execution graph mapping (Import/Require chains, Rule/WhenRules catalogues)
-- Confidence level for UDF discovery method used
+- Which UDF discovery method was used and how confident the results are
 
 ### Inputs
 
@@ -105,7 +105,7 @@ Used as a subagent by `osprey-rules` for project state discovery, but can also b
 
 ## skywatch-investigations
 
-Investigation toolkit for AT Protocol network analysis. Three-layer architecture: an MCP server for native tool access, skills that codify investigation methodology, and agents that orchestrate workflows.
+Investigation toolkit for AT Protocol network analysis. Three-layer architecture: an MCP server exposing ClickHouse, recon, and Ozone tools directly to Claude Code; skills defining each investigation phase; and agents that route between them.
 
 ### Architecture
 
@@ -253,9 +253,9 @@ skywatch-skills/
 
 ## Development
 
-Each plugin is self-contained under `plugins/`. The plugin `CLAUDE.md` files serve as the canonical reference for contracts, architecture, and invariants.
+Each plugin's `CLAUDE.md` serves as the canonical reference for its contracts, architecture, and invariants.
 
-Design plans, implementation plans, and test plans live under `docs/`. These are working documents, not user-facing documentation.
+The `docs/` directory holds internal design, implementation, and test plans — not user-facing documentation.
 
 The marketplace registry (`.claude-plugin/marketplace.json`) must stay in sync with individual `plugin.json` files. Version bumps happen in both places.
 
