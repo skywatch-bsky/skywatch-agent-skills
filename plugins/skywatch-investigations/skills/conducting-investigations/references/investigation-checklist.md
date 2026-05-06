@@ -162,7 +162,7 @@ A per-phase checklist to guide execution of the investigation methodology. Use t
 ## Phase 6: Reporting
 
 **Preparation:**
-- [ ] Selected report type: Memo / Cell Deep-Dive / Cross-Cell / Rule Check
+- [ ] Selected report type: Memo / Cluster Deep-Dive / Cross-Cluster / Rule Check
 - [ ] Reviewed `reporting-results` skill for formatting requirements
 - [ ] Compiled all evidence: tables, timelines, network data
 

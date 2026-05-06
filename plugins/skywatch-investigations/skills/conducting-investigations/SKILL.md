@@ -224,8 +224,8 @@ Dispatch a Sonnet subagent for ClickHouse queries:
 Synthesise all findings into a structured, actionable report. This phase produces the final artefact.
 
 **Actions:**
-- Select appropriate report type (memo, cell deep-dive, cross-cell, rule check)
-- Structure findings using the B-I-N-D-Ts format (see `reporting-results` skill)
+- Select appropriate report type (memo, cluster deep-dive, cross-cluster, rule check)
+- Structure findings using the BLIND format (see `reporting-results` skill)
 - Apply labels via `ozone_label` if the investigation warrants enforcement action
 - Apply tags via `ozone_tag` to link accounts to the investigation (e.g., campaign name tags)
 - Add investigator notes via `ozone_comment` for accounts that need ongoing monitoring

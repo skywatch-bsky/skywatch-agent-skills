@@ -239,7 +239,7 @@ Present the assessment using this format:
 [List any queries that returned no results and how they affected confidence]
 ```
 
-### On Request: B-I-N-D-Ts Report
+### On Request: BLIND Report
 
 When a full report is requested, load the `reporting-results` skill and produce a report using the structured assessment as source material:
 
@@ -249,4 +249,4 @@ When a full report is requested, load the `reporting-results` skill and produce 
 - **Details:** Full evidence trail from all 9 data collection categories
 - **Timestamps:** Data collection time range, assessment timestamp
 
-Select the **memo** report type for individual account assessments. Use **cell deep-dive** if the account is part of a larger network being investigated.
+Select the **memo** report type for individual account assessments. Use **cluster deep-dive** if the account is part of a larger network being investigated.

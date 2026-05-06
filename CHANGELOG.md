@@ -2,6 +2,13 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.23.6
+
+**Changed:**
+- Replaced confabulated "B-I-N-D-Ts" report format with BLIND (Bottom Line, Impact, Next Steps, Details) — the real structured briefing format from The Tongue and Quill
+- Timestamps and AT-URIs now live in the Details section as evidence, not as a separate top-level section
+- Renamed "cell" terminology to "cluster" throughout — report types are now memo, cluster deep-dive, cross-cluster, and rule check
+
 ## skywatch-investigations 0.23.5
 
 **Fixed:**
@@ -136,7 +143,7 @@ Initial release of the skywatch-investigations plugin.
 - Skill: `accessing-osprey` with Osprey schema reference
 - Skill: `querying-clickhouse` with 20 proven query patterns
 - Skill: `conducting-investigations` with 6-phase investigation methodology
-- Skill: `reporting-results` with B-I-N-D-Ts report templates
+- Skill: `reporting-results` with BLIND report templates
 - Agent: `investigator` with data-analyst delegation
 - Agent: `data-analyst` for ClickHouse query work
 - SessionStart hook for MCP server dependency installation

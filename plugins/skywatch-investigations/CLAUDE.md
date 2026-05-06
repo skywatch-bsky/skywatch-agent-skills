@@ -70,7 +70,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 - Co-sharing tools (`cosharing_clusters`, `cosharing_pairs`, `cosharing_evolution`) use `queryTrusted` to bypass validation for server-built queries with sanitised inputs (no LIMIT requirement)
 - All Ozone tools require explicit credentials — fail gracefully without them
 - Data-analyst always includes SQL used in its output (reproducibility)
-- Investigation reports follow B-I-N-D-Ts format (Bottom Line, Impact, Next Steps, Details, Timestamps)
+- Investigation reports follow BLIND format (Bottom Line, Impact, Next Steps, Details)
 - All Ozone write tools include modTool metadata (`name: "skywatch-mcp"`, batchId) for traceability
 - All Ozone write tools validate credentials before attempting API calls
 
@@ -126,7 +126,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 
 | File | Purpose |
 |------|---------|
-| `.claude-plugin/plugin.json` | Plugin manifest (name, version 0.23.5, metadata) |
+| `.claude-plugin/plugin.json` | Plugin manifest (name, version 0.23.6, metadata) |
 | `.mcp.json` | MCP server configuration with ClickHouse env vars (Ozone env vars set via shell/settings) |
 | `agents/investigator.md` | Orchestrator agent, dispatches data-analyst for queries |
 | `agents/data-analyst.md` | ClickHouse query agent, focused on osprey_execution_results |
@@ -134,7 +134,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 | `skills/accessing-osprey/SKILL.md` | Osprey system context and schema reference |
 | `skills/querying-clickhouse/SKILL.md` | ClickHouse query patterns and best practices |
 | `skills/conducting-investigations/SKILL.md` | Investigation methodology and correlation techniques |
-| `skills/reporting-results/SKILL.md` | Report structure, B-I-N-D-Ts format, presentation |
+| `skills/reporting-results/SKILL.md` | Report structure, BLIND format, presentation |
 | `skills/triage-rule-hits/SKILL.md` | Rule hit triage methodology (sampling, classification, health assessment) |
 | `skills/search-incidents/SKILL.md` | Topic-based incident search methodology |
 | `skills/classify-cluster/SKILL.md` | Co-sharing cluster classification methodology |

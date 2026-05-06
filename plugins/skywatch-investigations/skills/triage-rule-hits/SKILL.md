@@ -128,7 +128,7 @@ Pattern groups make the aggregate output actionable — instead of "15 false pos
 | **needs_update** | TP rate 40-59%, or significant FP patterns with clear fix available |
 | **needs_review** | TP rate < 40%, or novel patterns that fundamentally change what the rule should detect |
 
-### On Request: B-I-N-D-Ts Report
+### On Request: BLIND Report
 
 When a full report is requested, load the `reporting-results` skill:
 

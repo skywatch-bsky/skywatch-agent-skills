@@ -8,7 +8,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin marketpla
 |--------|---------|---------|
 | [osprey-rules](#osprey-rules) | 0.3.0 | SML rule authoring orchestrator with specialized subagents |
 | [osprey-rule-investigator](#osprey-rule-investigator) | 0.1.0 | Read-only analysis of SML rule projects |
-| [skywatch-investigations](#skywatch-investigations) | 0.18.0 | Network investigation toolkit (MCP + skills + agents) |
+| [skywatch-investigations](#skywatch-investigations) | 0.23.6 | Network investigation toolkit (MCP + skills + agents) |
 
 ## Installation
 
@@ -152,7 +152,7 @@ Investigation toolkit for AT Protocol network analysis. Three-layer architecture
 | `conducting-investigations` | All | Six-phase investigation methodology |
 | `accessing-osprey` | Setup | Osprey system context and schema reference |
 | `querying-clickhouse` | Query | ClickHouse query patterns and safety rules |
-| `reporting-results` | Report | B-I-N-D-Ts report format and conventions |
+| `reporting-results` | Report | BLIND report format and conventions |
 | `assess-account` | Phase 2 | Structured account assessment with classification |
 | `search-incidents` | Phase 1 | Topic-based incident search with relevance scoring |
 | `triage-rule-hits` | Phase 5 | Rule hit triage (TP/FP/novel classification) |
@@ -174,13 +174,12 @@ The plugin installs the MCP server — an external Python (FastMCP) package — 
 
 ### Investigation Methodology
 
-Investigations follow the B-I-N-D-Ts report format:
+Investigations follow the BLIND report format:
 
-- **B**ottom line — what happened, one sentence
-- **I**mpact — scope and severity
-- **N**ext steps — recommended actions
-- **D**etails — evidence and analysis
-- **T**imestamps — chronology of events
+- **BL** — Bottom line: what happened, one sentence
+- **I** — Impact on the network: scope and severity
+- **N** — Next steps: recommended actions
+- **D** — Details: evidence, analysis, timestamps, AT-URIs
 
 ### Environment Variables
 
@@ -231,7 +230,7 @@ skywatch-skills/
 │   │   ├── agents/                 # 1 agent (investigator)
 │   │   ├── skills/                 # 1 skill + UDF reference
 │   │   └── CLAUDE.md
-│   └── skywatch-investigations/    # v0.18.0
+│   └── skywatch-investigations/    # v0.23.6
 │       ├── .claude-plugin/
 │       │   └── plugin.json
 │       ├── .mcp.json               # MCP server config

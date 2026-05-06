@@ -156,7 +156,7 @@ Present results using this format:
 [List any days with 2x+ average volume, with date and count]
 ```
 
-### On Request: B-I-N-D-Ts Report
+### On Request: BLIND Report
 
 When a full report is requested, load the `reporting-results` skill and produce a report:
 
@@ -166,4 +166,4 @@ When a full report is requested, load the `reporting-results` skill and produce 
 - **Details:** Full classified results with evidence
 - **Timestamps:** Search time range, classification timestamp
 
-Select the **memo** report type for topic searches. Use **cross-cell** if the search reveals multiple distinct clusters or networks.
+Select the **memo** report type for topic searches. Use **cross-cluster** if the search reveals multiple distinct clusters or networks.

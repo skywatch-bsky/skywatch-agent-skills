@@ -171,7 +171,7 @@ For clusters classified as IO or spam, assign roles to members:
 [2-3 sentence analytical summary explaining the classification, key evidence, and what distinguishes this cluster from the alternative classification (i.e., why IO and not organic, or vice versa)]
 ```
 
-### On Request: B-I-N-D-Ts Report
+### On Request: BLIND Report
 
 When a full report is requested, load the `reporting-results` skill:
 
@@ -181,4 +181,4 @@ When a full report is requested, load the `reporting-results` skill:
 - **Details:** Full classification with member-by-member breakdown
 - **Timestamps:** Cluster formation/evolution timeline, assessment timestamp
 
-Select the **cell deep-dive** report type for single cluster analysis.
+Select the **cluster deep-dive** report type for single cluster analysis.

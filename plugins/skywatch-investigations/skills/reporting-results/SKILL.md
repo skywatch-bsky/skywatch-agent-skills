@@ -1,16 +1,21 @@
 ---
 name: reporting-results
-description: Report formats, B-I-N-D-Ts structure, data presentation, and output conventions for investigation reports. Use when writing or reviewing investigation reports. Includes templates for memo, cell deep-dive, cross-cell, and rule check report types.
+description: Report formats, BLIND structure, data presentation, and output conventions for investigation reports. Use when writing or reviewing investigation reports. Includes templates for memo, cluster deep-dive, cross-cluster, and rule check report types.
 user-invocable: false
 ---
 
 # Reporting Results
 
-This skill standardises the structure and presentation of investigation findings. All reports follow the B-I-N-D-Ts format and are stored using consistent naming and directory conventions.
+This skill standardises the structure and presentation of investigation findings. All reports follow the BLIND format and are stored using consistent naming and directory conventions.
 
-## B-I-N-D-Ts Report Structure
+## BLIND Report Structure
 
-The B-I-N-D-Ts framework ensures investigation findings are concise, actionable, and well-supported by evidence.
+BLIND is a structured briefing format adapted for AT Protocol investigations. It places the bottom line first, followed by key elements that support action.
+
+- **BL** — Bottom Line
+- **I** — Impact on the network
+- **N** — Next steps to be taken
+- **D** — Details to support the bottom line (evidence, timestamps, AT-URIs, queries)
 
 ### Bottom Line
 
@@ -29,13 +34,13 @@ A single sentence stating what was found and what it means. This should be the m
 
 ### Impact
 
-Quantify the scale and reach of the finding. This answers "how much does this matter?"
+Quantify the scale and reach of the finding on the network. This answers "how much does this matter?"
 
 **Include:**
 - Number of accounts involved
 - Time range of activity
 - Engagement metrics (total posts, likes, reposts, reach)
-- Targets (which accounts, topics, or sectors are affected?)
+- Targets (which accounts, topics, or communities are affected?)
 - Risk assessment: low / medium / high
 
 **Format:**
@@ -90,12 +95,15 @@ The complete evidence section. This is where you show all supporting data, timel
 - Content examples (most significant posts or patterns)
 - Rule hit analysis (which rules triggered, which didn't)
 - SQL queries used for data extraction (for reproducibility)
+- Timestamps: investigation dates, data collection period, report authored date
+- AT-URIs for cited content (verbatim references, not summaries)
 
 **Format Guidelines:**
 - Use tables for structured data (account lists, rule hit counts, engagement metrics)
 - Use timelines for temporal patterns (ASCII or markdown)
 - Use bullet lists for evidence summaries and findings
 - Include SQL query blocks with syntax highlighting
+- Include a timestamps block at the end of the Details section for traceability
 
 **Example table:**
 ```
@@ -105,18 +113,7 @@ The complete evidence section. This is where you show all supporting data, timel
 | @acc2 | Account | 298 | 12 | pds.example.com | 2025-11 |
 ```
 
-### Timestamps
-
-Always record investigation timeline and data ranges. This ensures traceability and reproducibility.
-
-**Include:**
-- Investigation start date
-- Investigation completion date
-- Data collection period (start and end dates)
-- Report authored date
-- Any updates or revisions made since original report
-
-**Format:**
+**Timestamps block** (always include at the end of Details):
 ```
 - Investigation conducted: 2026-03-10 to 2026-03-19
 - Data range analysed: 2026-02-15 to 2026-03-19
@@ -128,7 +125,7 @@ Always record investigation timeline and data ranges. This ensures traceability 
 
 ## Report Types
 
-Select the report type based on investigation scope and findings. Each type emphasizes different aspects while maintaining the B-I-N-D-Ts structure.
+Select the report type based on investigation scope and findings. Each type emphasizes different aspects while maintaining the BLIND structure.
 
 ### Memo
 
@@ -142,8 +139,7 @@ Select the report type based on investigation scope and findings. Each type emph
 - Bottom Line (brief, high-level)
 - Impact (account counts, reach, risk)
 - Next Steps (enforcement or monitoring)
-- Details (account profile, key evidence)
-- Timestamps
+- Details (account profile, key evidence, timestamps)
 
 **Length:** 1-3 pages
 
@@ -166,32 +162,32 @@ Select the report type based on investigation scope and findings. Each type emph
   - Coordination Evidence (content matching, temporal correlation, shared infrastructure)
   - Amplification Map (primary targets, engagement metrics, spread patterns)
   - Rule Coverage Analysis (Phase 5 findings)
-- Timestamps
+  - Timestamps
 
 **Length:** 3-8 pages depending on network size
 
-**File naming:** `YYYY-MM-DD-cluster-{cell-identifier}.md`
+**File naming:** `YYYY-MM-DD-cluster-{identifier}.md`
 
 ### Cross-Cluster
 
 **When to use:** Comparison and analysis of multiple coordinated networks that appear related. Identifies shared tactics, infrastructure, or operators.
 
-**Scope:** Analysis linking 2+ cells together; may reference existing cell deep-dive reports.
+**Scope:** Analysis linking 2+ clusters together; may reference existing cluster deep-dive reports.
 
-**Emphasis:** Cross-cell patterns, shared infrastructure, coordinated operations, and comparative analysis.
+**Emphasis:** Cross-cluster patterns, shared infrastructure, coordinated operations, and comparative analysis.
 
 **Key sections:**
 - Bottom Line
-- Impact (total accounts across cells, aggregate reach, shared targets)
+- Impact (total accounts across clusters, aggregate reach, shared targets)
 - Next Steps (coordination-level labelling, rule updates)
-- Details (comparative tables, cross-cell network graph, infrastructure map)
-  - Cell Comparison Matrix (accounts, infrastructure, tactics, timeline overlap)
+- Details (comparative tables, cross-cluster network graph, infrastructure map)
+  - Cluster Comparison Matrix (accounts, infrastructure, tactics, timeline overlap)
   - Shared Infrastructure Evidence (domains, PDS hosts, ASN overlap)
   - Shared Tactics (common content, posting patterns, amplification strategies)
   - Hypothesised Relationships (likely operator, operational unit, or shared purpose)
-- Timestamps
+  - Timestamps
 
-**Length:** 4-10 pages depending on number of cells
+**Length:** 4-10 pages depending on number of clusters
 
 **File naming:** `YYYY-MM-DD-cross-cluster-{description}.md`
 
@@ -211,7 +207,7 @@ Select the report type based on investigation scope and findings. Each type emph
   - Rule Coverage Summary (coverage by rule type, accounts caught, accounts missed)
   - Gap Analysis (behaviour patterns not caught, suggested new rules)
   - Rule Recommendations (new rules, rule modifications, threshold adjustments)
-- Timestamps
+  - Timestamps
 
 **Length:** 2-5 pages
 
@@ -269,8 +265,8 @@ Use bullet lists for evidence summaries and qualitative findings:
 Use Obsidian wiki-style links for all internal references within reports — other reports, accounts, skills, or investigation artefacts.
 
 **Format:**
-- Link to other reports: `[[2026-03-19-cell-coordinated-network-47]]`
-- Link to specific sections: `[[2026-03-19-cell-coordinated-network-47#Network Summary]]`
+- Link to other reports: `[[2026-03-19-cluster-coordinated-network-47]]`
+- Link to specific sections: `[[2026-03-19-cluster-coordinated-network-47#Network Summary]]`
 - Link to accounts: `[[accounts/did:plc:abc123]]`
 - Link to related skills: `[[conducting-investigations]]`, `[[querying-clickhouse]]`
 
@@ -315,13 +311,13 @@ YYYY-MM-DD-{type}-{identifier}.md
 
 **Examples:**
 - `2026-03-19-memo-spam-account.md`
-- `2026-03-19-cell-coordinated-network-47.md`
-- `2026-03-19-cross-cell-infrastructure-overlap.md`
+- `2026-03-19-cluster-coordinated-network-47.md`
+- `2026-03-19-cross-cluster-infrastructure-overlap.md`
 - `2026-03-19-rule-check-copypasta-detection.md`
 
 ### Metadata Block
 
-Include investigation metadata at the top of every report (after B-I-N-D-Ts title):
+Include investigation metadata at the top of every report (after BLIND title):
 
 ```markdown
 # Investigation Report: [Brief Title]
@@ -371,8 +367,7 @@ Use this checklist when reviewing investigation reports before publication:
 - [ ] Bottom Line is a single sentence and captures the key finding
 - [ ] Impact section includes account counts, reach, and risk assessment
 - [ ] Next Steps are specific and actionable
-- [ ] Details include supporting data and SQL queries
-- [ ] Timestamps document investigation period and data range
+- [ ] Details include supporting data, SQL queries, and timestamps
 
 **Evidence:**
 - [ ] All major claims are supported by data
