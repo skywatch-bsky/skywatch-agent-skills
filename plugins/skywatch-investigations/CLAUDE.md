@@ -60,7 +60,8 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 - `working-the-queue` treats each reported AT-URI as a separate subject — never rolls up or deduplicates multiple reported posts from the same account
 - `working-the-queue` evaluates replies in thread context (parent post, account relationship, reporter identity) before classification
 - `working-the-queue` delegates per-subject data collection to subagents to preserve triage agent context window; subagents return recommendations with supporting evidence
-- `working-the-queue` and `assess-account` supplement ClickHouse data with PDS record fetching via `list_records` (PDSX) when ClickHouse returns insufficient content — ClickHouse covers ~2 months, not the full account history
+- `working-the-queue` caps initial content fetch to 5 posts per subject (plus thread context for replies); deeper content fetching (PDS `list_records`, additional ClickHouse queries) is reserved for analyst-requested follow-up, capped at 10 posts per follow-up
+- `assess-account` supplements ClickHouse data with PDS record fetching via `list_records` (PDSX) when ClickHouse returns insufficient content — ClickHouse covers ~2 months, not the full account history
 - `working-the-queue` proactively recommends account-level labels when post-level evidence reveals systemic behaviour patterns
 - `working-the-queue` label actions include evidence comments with specific AT-URIs, verbatim post text, and editorial notes — minimum 2 cited posts per label
 - `working-the-queue` treats all reports as nominations — reporter comments direct investigation but are never evidence for or against the subject; classification is based solely on the subject's actual content and behaviour
@@ -126,7 +127,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 
 | File | Purpose |
 |------|---------|
-| `.claude-plugin/plugin.json` | Plugin manifest (name, version 0.23.7, metadata) |
+| `.claude-plugin/plugin.json` | Plugin manifest (name, version 0.23.8, metadata) |
 | `.mcp.json` | MCP server configuration with ClickHouse env vars (Ozone env vars set via shell/settings) |
 | `agents/investigator.md` | Orchestrator agent, dispatches data-analyst for queries |
 | `agents/data-analyst.md` | ClickHouse query agent, focused on osprey_execution_results |

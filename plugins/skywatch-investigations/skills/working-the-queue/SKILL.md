@@ -82,7 +82,7 @@ When recommending an account-level label, add it as a separate classification en
 
 ClickHouse (`osprey_execution_results`) retains approximately 2 months of data. This is a partial view of an account's history, NOT the complete picture. Thin or absent ClickHouse results mean the data hasn't been indexed — not that the account has no content. **Never conclude an account has "zero content" or "nothing to evaluate" based solely on ClickHouse returning few or no results.**
 
-When ClickHouse returns fewer than 20 posts for a subject, or when the reporter's claims cannot be verified from ClickHouse data alone, the subagent MUST supplement by fetching posts directly from the account's PDS using `list_records` (PDSX tool) with collection `app.bsky.feed.post`. This retrieves the account's actual post history regardless of the ClickHouse indexing window.
+When ClickHouse data is insufficient and the reporter's claims cannot be verified, note this in the classification as `investigate_further` or flag it to the analyst. **Do NOT automatically fetch additional posts from the PDS** — reserve deeper content fetching for when the analyst explicitly requests more context.
 
 ### Per-Subject Data Collection
 
@@ -93,11 +93,11 @@ For each subject, dispatch a **Sonnet** subagent to gather context. Use Sonnet f
 > Gather moderation context for subject [DID or AT-URI]. Collect:
 > (1) **Profile** — fetch the account's profile via `get_record` (PDSX, uri `app.bsky.actor.profile/self`, repo [DID]). Return the handle, display name, and bio/description verbatim.
 > (2) **Moderation history** — from ozone_query_events: prior reports, labels, actions, sticky comments.
-> (3) **Content context** — 20 most recent posts from this DID via ClickHouse osprey_execution_results with post text, timestamps, and matched rules, plus rule hits for the past 30 days grouped by rule name with counts.
+> (3) **Content context** — 5 most recent posts from this DID via ClickHouse osprey_execution_results with post text, timestamps, and matched rules, plus rule hits for the past 30 days grouped by rule name with counts.
 > (4) **Report details** — what was reported, by whom, what reason was given.
 > (5) If the subject is a reply, **thread context** — the parent post, the account being replied to, and the relationship between the accounts.
 >
-> IMPORTANT: ClickHouse only covers ~2 months of data. If ClickHouse returns fewer than 20 posts, you MUST also fetch posts directly from the account's PDS using the `list_records` PDSX tool with collection `app.bsky.feed.post` and the subject's DID as `repo`. Paginate with limit 25 and use the cursor to fetch multiple pages — aim for at least 50 posts or until you run out of content. This is essential for accounts that pre-date the ClickHouse window or have sparse recent activity.
+> TOKEN BUDGET: Fetch a MAXIMUM of 5 posts for content context. If the subject is a reply, also fetch the thread context (parent chain up to 3 levels) — this does NOT count against the 5-post cap. Do NOT fetch additional posts from the PDS. If 5 posts are insufficient for a confident classification, recommend `investigate_further` and note what additional context would help.
 >
 > CRITICAL: Return ALL content verbatim. Do NOT summarise, paraphrase, or excerpt. The analyst reviews the evidence and makes the decision — the agent's role is to gather and present, not to judge. Specifically return:
 > (a) The account's handle, display name, and bio/description — verbatim.
@@ -105,9 +105,7 @@ For each subject, dispatch a **Sonnet** subagent to gather context. Use Sonnet f
 > (c) The full text of every post reviewed, with AT-URIs and timestamps.
 > (d) A recommended classification (label / no_action / investigate_further / escalate / defer) with a recommended label and label level if applicable.
 > (e) The specific evidence supporting that recommendation — rule hit patterns, moderation history, thread context.
-> (f) Whether content was sourced from ClickHouse, PDS list_records, or both — and how many posts were reviewed from each source.
->
-> Be verbose. More evidence is always better than less.
+> (f) How many posts were reviewed and whether the 5-post cap limited the assessment (if so, note what additional context might change the recommendation).
 
 The subagent should use the data-analyst agent for ClickHouse queries, the `list_records` PDSX tool directly for PDS record fetching, and MCP tools directly for Ozone queries. The primary agent makes the final classification decision but uses the subagent's recommendation and evidence as input.
 
@@ -123,11 +121,9 @@ This reveals whether the subject is a repeat offender, has prior context, or has
 
 #### 2. Content Context
 
-Query via data-analyst: pull the 20 most recent posts from DID [subject_did] from osprey_execution_results. Return post text, timestamp, and any rules that matched. Also return any rule hits for this DID in the past 30 days grouped by rule name with hit counts.
+Query via data-analyst: pull the **5 most recent posts** from DID [subject_did] from osprey_execution_results. Return post text, timestamp, and any rules that matched. Also return any rule hits for this DID in the past 30 days grouped by rule name with hit counts.
 
-If ClickHouse returns fewer than 20 posts, also fetch posts directly from the PDS using `list_records` (PDSX tool) with collection `app.bsky.feed.post` and the subject's DID as `repo`. Paginate to collect at least 50 posts. Record which source each piece of content came from.
-
-ClickHouse covers ~2 months. The PDS holds the full account history. Both are needed for a complete picture — ClickHouse provides rule-match context, the PDS provides content completeness.
+**Do NOT automatically fetch additional posts from the PDS.** 5 posts plus rule hit summaries is sufficient for initial triage. If the evidence is insufficient, classify as `investigate_further` — the analyst can request deeper content fetching.
 
 #### 3. Report Content
 
@@ -161,18 +157,18 @@ If the reported content is a reply, the reply MUST be evaluated in the context o
 
 ### Follow-Up Investigation
 
-After reviewing a subagent's returned summary and recommendation, the primary triage agent may determine the evidence is insufficient for a confident classification. When this happens, dispatch additional Sonnet subagents to fill the gap. Do not settle for low-confidence classifications when more data is available.
+The initial scan is intentionally lean (5 posts per subject). When the analyst requests more context — or when a subject is classified as `investigate_further` and the analyst approves deeper investigation — dispatch additional Sonnet subagents. **Do not proactively fetch additional posts beyond the initial 5 unless the analyst asks.**
 
-Examples of follow-up dispatches:
+Examples of follow-up dispatches (analyst-triggered):
 
-- **PDS record fetching** — "Fetch posts from DID [X] via `list_records` (PDSX tool, collection `app.bsky.feed.post`, repo [DID]). Paginate to get at least 50-100 posts. Return post text and timestamps." Use this whenever ClickHouse data is thin or the reporter's claims can't be verified from indexed content alone.
+- **More posts** — "Fetch up to 10 additional posts from DID [X] via ClickHouse or `list_records` (PDSX tool, collection `app.bsky.feed.post`, repo [DID]). Return post text, AT-URIs, and timestamps." Cap at 10 posts per follow-up request.
 - **Deeper ClickHouse queries** — "Pull all posts from this DID in the past 7 days that matched rule [X]. Return full post text and timestamps." or "Find all accounts that co-shared URLs with this DID in the past 7 days."
 - **Thread expansion** — "Retrieve the full thread for AT-URI [X] — all replies, not just the parent chain."
 - **Account relationship check** — "Determine the follow relationship between DID [A] and DID [B]. Check if they have prior interaction history."
 - **Content similarity** — "Find posts across the network with similar text to [quoted content] using content_similarity."
 - **Additional moderation history** — "Pull full ozone_query_events for DID [X] going back 90 days, not just the default."
 
-The triage agent owns the classification decision. If the initial subagent's evidence leaves gaps, fill them rather than guessing. The cost of an additional Sonnet subagent is trivial compared to a wrong moderation action.
+The triage agent owns the classification decision. When evidence is thin, classify as `investigate_further` rather than guessing — let the analyst decide whether to invest tokens in deeper investigation.
 
 ### Batch-Level Bias Check
 
@@ -336,7 +332,7 @@ Rules:
 - For replies, show the parent post(s) above the reply with their AT-URIs so the thread reads top-to-bottom.
 - For images or media that can't be displayed as text, write "[image]" and provide the AT-URI so the analyst can review it directly.
 - Profile fields are always verbatim. If a field is empty, write "(none)".
-- The "Content Reviewed" section must include ALL posts the subagent reviewed, not a curated subset. If the subagent reviewed 50 posts, list all 50.
+- The "Content Reviewed" section must include ALL posts the subagent reviewed, not a curated subset.
 - **NEVER summarise, paraphrase, excerpt, or editorialise content in place of showing it.** Characterisations like "right-wing reply-guy" or "combative but contextual" are not evidence — they are conclusions. The content speaks for itself.
 
 **Human in the loop:** The agent presents evidence and recommendations. The analyst makes decisions. No label is applied without the analyst's explicit confirmation. Verbose output is expected and preferred — more evidence is always better than less.
