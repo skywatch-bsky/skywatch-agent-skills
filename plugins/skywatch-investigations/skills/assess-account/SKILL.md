@@ -13,7 +13,7 @@ user-invocable: false
 
 This skill guides structured assessment of AT Protocol accounts. It defines what data to collect, how to classify the account, and what output to produce. The result is a consistent, repeatable assessment that replaces ad-hoc manual profiling.
 
-Use this skill when you need to determine what type of account you're looking at (genuine, bot, IO, scam, spam) and what to do about it.
+Use this skill when you need to determine what type of account you're looking at (genuine, policy violator, bot, IO, scam, spam) and what to do about it.
 
 ## Input
 
@@ -131,7 +131,7 @@ Apply the following schema to the collected data, extended by any loaded policie
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `account_type` | enum | `genuine`, `bot`, `io_suspected`, `scam`, `spam`, `hybrid`, `insufficient_data`, plus any custom types from `.policies/` |
+| `account_type` | enum | `genuine`, `policy_violator`, `bot`, `io_suspected`, `scam`, `spam`, `hybrid`, `insufficient_data`, plus any custom types from `.policies/` |
 | `confidence` | enum | `high`, `medium`, `low` |
 | `signals` | list | Evidence items supporting the classification (see Signal Catalogue below, extended by policy signals) |
 | `topic_breakdown` | map | Topic -> percentage of content (e.g., `{"politics/elections": 70, "sports": 20, "other": 10}`) |
@@ -170,6 +170,16 @@ Classify by evaluating signals from each category. An account may exhibit signal
 - **Template repetition**: Same message posted repeatedly with minor variations
 - **High volume, low engagement**: Many posts but minimal genuine interaction
 
+#### Policy Violator Signals
+- **Sustained rule hits**: Repeated rule triggers over weeks/months — not a one-off but a pattern of behaviour
+- **Consistent violation type**: Rule hits concentrated on the same policy area (e.g., hate speech, harassment, dehumanisation)
+- **Escalating severity**: Content that gets progressively worse over time, or shifts to evade prior moderation
+- **Post-label recidivism**: Account continues the same violating behaviour after a prior label was applied or appealed
+- **Targeted behaviour**: Pattern of directing violating content at specific users, groups, or communities
+- **Otherwise authentic account**: Natural posting patterns, varied non-violating content, established history — the account is genuine, not automated or coordinated, but repeatedly breaks policy
+
+**Note:** An account classified as `genuine` that triggers multiple Policy Violator signals should be reclassified as `policy_violator`. "Genuine" describes authenticity, not compliance. A real person can be a serial policy violator.
+
 #### Genuine Signals
 - **Varied topics**: Content spans multiple unrelated topics
 - **Organic engagement**: Mix of original posts, replies, reposts with natural variation
@@ -196,7 +206,8 @@ Classify by evaluating signals from each category. An account may exhibit signal
 
 | account_type | Default Recommendation | Override Conditions |
 |-------------|----------------------|-------------------|
-| `genuine` | `no_action` | If in a co-sharing cluster: `monitor` |
+| `genuine` | `no_action` | If in a co-sharing cluster: `monitor`. If rule hits show sustained policy violations: reclassify as `policy_violator` |
+| `policy_violator` | `label` | If severe or sustained (3+ months of hits, or targeted harassment): `label_and_escalate` |
 | `bot` | `label` | If high-volume + harmful content: `label_and_escalate` |
 | `io_suspected` | `escalate` | If strong evidence (high confidence): `label_and_escalate` |
 | `scam` | `label_and_escalate` | — |

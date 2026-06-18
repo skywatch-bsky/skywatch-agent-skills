@@ -51,7 +51,7 @@
       "name": "skywatch-investigations",
       "source": "./plugins/skywatch-investigations",
       "description": "Investigation toolkit for AT Protocol network analysis — MCP tools for ClickHouse data access, domain/IP/URL recon, content similarity, and Ozone labelling, with skills codifying investigation methodology and agents orchestrating the full workflow.",
-      "version": "0.23.7",
+      "version": "0.24.0",
       "author": {
         "name": "Skywatch Blue"
       },

@@ -24,7 +24,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
   - `querying-clickhouse` — ClickHouse query patterns and best practices
   - `conducting-investigations` — investigation methodology (reconnaissance, correlation, analysis)
   - `reporting-results` — report structure, formatting, and presentation
-  - `assess-account` — structured account assessment with classification schema and recommendation
+  - `assess-account` — structured account assessment with classification schema and recommendation (includes `policy_violator` type for genuine accounts with sustained rule-breaking behaviour)
   - `search-incidents` — topic-based incident search with relevance scoring and content classification
   - `triage-rule-hits` — rule hit triage with TP/FP/novel classification and rule health assessment
   - `classify-cluster` — co-sharing cluster narrative classification distinguishing IO from organic coordination
@@ -64,6 +64,8 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 - `working-the-queue` delegates per-subject data collection to subagents to preserve triage agent context window; subagents return recommendations with supporting evidence
 - `working-the-queue` uses ClickHouse as the primary data source (rule hits first, then content) — PDS queries are fallback only; caps initial content fetch to 5 posts per subject (plus thread context for replies); deeper fetching is analyst-triggered, capped at 10 posts per follow-up
 - `assess-account` supplements ClickHouse data with PDS record fetching via `list_records` (PDSX) when ClickHouse returns insufficient content — ClickHouse covers ~2 months, not the full account history
+- `assess-account` classifies genuine accounts with sustained policy violations as `policy_violator` (not `genuine`) — authenticity and compliance are independent axes
+- `conducting-investigations` Phase 2 has three branches: coordination → Phase 3, individual policy violator → Phase 6 (enforcement), benign → close. Coordination is not a prerequisite for enforcement action
 - `working-the-queue` proactively recommends account-level labels when post-level evidence reveals systemic behaviour patterns
 - `working-the-queue` label actions include evidence comments per `labeling-standards` — specific AT-URIs, verbatim post text, and editorial notes
 - `working-the-queue` treats all reports as nominations — reporter comments direct investigation but are never evidence for or against the subject; classification is based solely on the subject's actual content and behaviour

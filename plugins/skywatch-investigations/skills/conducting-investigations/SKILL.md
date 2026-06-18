@@ -100,7 +100,12 @@ Dispatch a Sonnet subagent for ClickHouse queries:
 **Decision Point:**
 - Is the behaviour consistent with a bot, human, or coordinated group?
 - Are there indicators of deception (fake profile, mismatched metadata)?
-- Proceed to Phase 3 (Linkage) if the account shows signs of coordination or anomalous behaviour.
+- Does the account show sustained policy violations regardless of coordination?
+
+Three branches:
+1. **Signs of coordination or anomalous multi-account behaviour** → Proceed to Phase 3 (Linkage)
+2. **Individual account with sustained policy violations** (genuine human, not coordinated, but repeatedly violating rules) → Skip to Phase 6 (Reporting) with enforcement recommendation. Coordination is not a prerequisite for action — an uncoordinated account with a pattern of policy-violating behaviour warrants labelling based on its own conduct. Use `assess-account` to produce a structured assessment if not already done.
+3. **Benign / explained / isolated one-off** → Document conclusion and close investigation.
 
 ---
 
@@ -268,6 +273,13 @@ What constitutes sufficient evidence for different conclusion types:
 - Accounts sharing Ozone tags from prior reviews: confirms a previously identified network
 - Quote overdispersion on network-authored posts: confirms the network is successfully amplifying its own content
 
+**Individual Policy Violation (no coordination required):**
+- Sustained rule hits on the same policy area over 2+ weeks: moderate confidence, actionable
+- Post-label recidivism (continues violating after prior moderation): high confidence, actionable
+- 3+ distinct posts violating the same policy, with rule hit evidence: high confidence, label
+- Targeted behaviour directed at specific users/groups across multiple posts: high confidence, label and escalate
+- Single post violation with no prior history: low confidence — handle via queue triage (`working-the-queue`), not the investigation pathway
+
 **Rule Coverage:**
 - 80%+ of problematic accounts hit at least one rule: adequate coverage
 - 50-80%: moderate coverage, gaps present
@@ -301,18 +313,22 @@ File naming: Use ISO date format (YYYY-MM-DD) with brief case identifier. Keep q
 When to escalate findings vs. continuing investigation:
 
 **Escalate Immediately:**
-- Evidence of targeted harassment or abuse
+- Evidence of targeted harassment or abuse (coordinated or individual)
 - Child safety concerns
 - Coordinated deception at scale (100+ accounts)
 - External platform involvement (cross-platform spam/coordination)
+- Individual account with severe, sustained policy violations (e.g., persistent hate speech, targeted abuse campaigns) — severity determines escalation priority, not whether the behaviour is coordinated
 
 **Escalate After Phase 5:**
 - Network with significant reach and demonstrated harm
 - Evasion of current rules at scale
 - Recommended rule changes or new detection needed
 
+**Label Without Escalation:**
+- Individual account with moderate, sustained policy violations — apply the appropriate label via Phase 6 without requiring escalation
+- Account classified as `policy_violator` with high confidence via `assess-account`
+
 **Continue Investigating Internally:**
-- Single-account behaviour (Phase 2 finding)
 - Isolated pattern with low impact
 - Suspected coordination but insufficient evidence (continue through Phase 3)
 

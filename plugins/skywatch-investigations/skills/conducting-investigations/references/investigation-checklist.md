@@ -56,8 +56,10 @@ A per-phase checklist to guide execution of the investigation methodology. Use t
 **Decision & Next Steps:**
 - [ ] Assessment: Does behaviour suggest bot, human, or coordinated group?
 - [ ] Does profile show signs of compromise or inauthentic operation?
+- [ ] Does the account show sustained policy violations regardless of coordination?
 - [ ] If coordinated/anomalous: Proceed to Phase 3
-- [ ] If isolated/explained: Document and close
+- [ ] If individual with sustained policy violations: Skip to Phase 6 (enforcement)
+- [ ] If benign/explained/isolated one-off: Document and close
 
 ---
 
