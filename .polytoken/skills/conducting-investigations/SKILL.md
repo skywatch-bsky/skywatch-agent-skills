@@ -1,7 +1,6 @@
 ---
-name: conducting-investigations
-description: Six-phase investigation methodology for AT Protocol network analysis — from initial discovery through reporting. Covers tool selection, signal identification, evidence standards, and directory conventions. Use when conducting or planning investigations.
-user-invocable: false
+description: >-
+  Six-phase investigation methodology for AT Protocol network analysis — from initial discovery through reporting. Covers tool selection, signal identification, evidence standards, and directory conventions. Use when conducting or planning investigations.
 ---
 
 # Conducting Investigations
@@ -10,17 +9,7 @@ This skill guides investigation of suspicious activity on the AT Protocol, using
 
 ### ClickHouse Query Delegation
 
-All ClickHouse queries must be dispatched to Sonnet subagents. ClickHouse querying is a rote activity — formulate SQL, execute, parse — and it consumes context window space with raw data. Dispatch a subagent with the research question, receive a structured summary back. The investigator works from summaries, not raw query results. MCP tools (co-sharing, recon) can be called directly.
-
-### Data Source Priority
-
-When retrieving post content, profile data, or hydrating AT-URIs, always follow this cascade:
-
-1. **ClickHouse first** — query `osprey_execution_results` for post content, profile metadata, and rule match context. Cheapest, fastest, includes rule match data. Covers ~2 months.
-2. **Slingshot second** — for specific AT-URIs outside the ClickHouse window, use Slingshot `getRecordByUri`. Fast, cached, no auth needed.
-3. **PDS direct last** — use PDSX `get_record` or `list_records` only when neither ClickHouse nor Slingshot can provide what you need (pre-indexing-window accounts, taken-down accounts, collection browsing).
-
-Never go straight to Slingshot or PDSX without trying ClickHouse first. ClickHouse data includes rule match context that external sources lack.
+All ClickHouse queries must be dispatched to `data-analyst` subagents. ClickHouse querying is a rote activity — formulate SQL, execute, parse — and it consumes context window space with raw data. Dispatch a subagent with the research question, receive a structured summary back. The investigator works from summaries, not raw query results. MCP tools (co-sharing, recon) can be called directly.
 
 ## Phase 1: Discovery
 
@@ -41,7 +30,7 @@ Start from a lead — reported accounts, rule hits, or suspicious patterns obser
 
 **Tool Guidance:**
 
-Dispatch a Sonnet subagent for all ClickHouse queries — the task is rote and preserves the investigator's context window for analysis:
+Dispatch the `data-analyst` subagent for all ClickHouse queries — the task is rote and preserves the investigator's context window for analysis:
 
 - Subagent: "Pull rule hit history for DID [X] — temporal distribution, rule types triggered, counts by rule over the past 90 days"
 - Subagent: "Check account_entropy_results for DID [X] — is it flagged as bot-like? Return entropy values"
@@ -49,12 +38,11 @@ Dispatch a Sonnet subagent for all ClickHouse queries — the task is rote and p
 - Subagent: "Check quote_overdispersion_results for DID [X] — does this account appear as quoted_author_did with anomalous quoting rates? Also check if this DID appears in sample_dids (as a quoter in campaigns)"
 - Subagent: "Check pds_signup_anomalies for the PDS hosting DID [X] — any anomalous signup volume?"
 - Subagent: "Check quote_cosharing_membership for DID [X] — is this account part of any quote co-sharing clusters?"
-- `cosharing_clusters` with `did` — Check if target accounts belong to any URL co-sharing clusters. Cluster membership is an early coordination signal.
-- `ozone_query_statuses` with the target DID — Pull current moderation status: existing labels, review state, tags, open reports
-- `ozone_query_events` with the target DID — Pull moderation event log: prior labelling actions, escalations, appeals, reviewer comments
-- `domain_check` — Verify any domains mentioned in problematic content
-- Subagent: "Fetch profile data for DID [X] from osprey_execution_results — latest handle, display_name, follower_count, post_count, account_age_days. Also sample recent content for impersonation checks."
-- Fallback: If ClickHouse returns no profile data, use `describe_repo` (PDSX) or Slingshot `getRecord` for `app.bsky.actor.profile/self`
+- `mcp__skywatch-mcp__cosharing_clusters` with `did` — Check if target accounts belong to any URL co-sharing clusters. Cluster membership is an early coordination signal.
+- `mcp__skywatch-mcp__ozone_query_statuses` with the target DID — Pull current moderation status: existing labels, review state, tags, open reports
+- `mcp__skywatch-mcp__ozone_query_events` with the target DID — Pull moderation event log: prior labelling actions, escalations, appeals, reviewer comments
+- `mcp__skywatch-mcp__domain_check` — Verify any domains mentioned in problematic content
+- `mcp__pdsx__describe_repo` (PDSX) or Slingshot `getRecord` — Fetch the AT Protocol profile (display name, bio, avatar) for impersonation checks
 
 **Signals to Document:**
 - Volume of rule hits (count and frequency)
@@ -90,15 +78,14 @@ Build a comprehensive profile of the target account(s). This phase focuses on un
 
 **Tool Guidance:**
 
-Dispatch a Sonnet subagent for ClickHouse queries:
+Dispatch the `data-analyst` subagent for ClickHouse queries:
 
 - Subagent: "Generate a detailed activity timeline for DID [X] — posting statistics by hour/day, content themes, total volume"
 - Subagent: "Get entropy scores from account_entropy_results for DID [X]. High hourly_entropy (≥ 3.9) = uniform 24-hour posting; low interval_entropy (≤ 1.5) = mechanical spacing. Both = is_bot_like."
-- `ozone_query_events` with the target DID — Integrate moderation events into the activity timeline (when were labels applied? when were appeals filed? when were labels removed?)
-- Subagent: "Fetch profile metadata and recent content for DID [X] from osprey_execution_results — handle, follower_count, post_count, account_age_days, pds_host, plus 10 recent posts with content text."
-- Fallback: If ClickHouse returns insufficient profile data, use `describe_repo` (PDSX) or Slingshot for `app.bsky.actor.profile/self` (bio, avatar, display name). Use `list_records` with `app.bsky.graph.follow` to sample follow targets if follow-farming is suspected.
-- `ip_lookup` — Resolve any IP addresses associated with content or metadata
-- `whois_lookup` — Query registration details for discovered domains. Always run on custom-domain handles.
+- `mcp__skywatch-mcp__ozone_query_events` with the target DID — Integrate moderation events into the activity timeline (when were labels applied? when were appeals filed? when were labels removed?)
+- `mcp__pdsx__describe_repo` (PDSX) or Slingshot — Fetch current profile record. Check `app.bsky.actor.profile/self` for bio, avatar, display name. Use `mcp__pdsx__list_records` with `app.bsky.graph.follow` to sample follow targets if follow-farming is suspected.
+- `mcp__skywatch-mcp__ip_lookup` — Resolve any IP addresses associated with content or metadata
+- `mcp__skywatch-mcp__whois_lookup` — Query registration details for discovered domains. Always run on custom-domain handles.
 
 **Signals to Document:**
 - Posting volume and temporal distribution (concentrated hours vs. 24/7 activity?)
@@ -138,18 +125,18 @@ Find connected accounts. This phase identifies other accounts exhibiting similar
 
 **Tool Guidance:**
 
-Dispatch a Sonnet subagent for ClickHouse queries:
+Dispatch the `data-analyst` subagent for ClickHouse queries:
 
 - Subagent: "Cluster these DIDs by shared patterns — same URLs, same domains, same posting times. Use GROUP BY to find commonalities."
 - Subagent: "Check account_entropy_results for DIDs [list]. Which are flagged is_bot_like? Do they share similar entropy profiles?"
 - Subagent: "Check url_overdispersion_results — do any of these DIDs appear together in sample_dids for the same anomalous domain?"
 - Subagent: "Check quote_overdispersion_results — are any posts by these DIDs being quoted at anomalous rates? Also check if these DIDs co-appear in sample_dids as quoters of the same target"
 - Subagent: "Check quote_cosharing_membership for DIDs [list] — are any of these accounts in the same quote co-sharing clusters? Return cluster_ids, member_counts, sample_uris"
-- `content_similarity` — Find accounts posting the same or similar content (detects copypasta, template reuse)
-- `cosharing_clusters` with `did` — Check if target accounts belong to URL co-sharing clusters. Multiple target accounts in the same cluster is strong evidence of coordination.
-- `cosharing_pairs` with `did` — Drill into raw co-sharing edges to see exactly which URLs are being co-shared and with whom.
-- `cosharing_evolution` with `cluster_id` — If a cluster is found, trace its history to understand when the coordination started and how the network has evolved.
-- `ozone_query_statuses` with tags — Check if linked accounts share Ozone tags (e.g., same campaign tag applied by a prior reviewer). Shared tags from prior reviews are a strong linkage signal.
+- `mcp__skywatch-mcp__content_similarity` — Find accounts posting the same or similar content (detects copypasta, template reuse)
+- `mcp__skywatch-mcp__cosharing_clusters` with `did` — Check if target accounts belong to URL co-sharing clusters. Multiple target accounts in the same cluster is strong evidence of coordination.
+- `mcp__skywatch-mcp__cosharing_pairs` with `did` — Drill into raw co-sharing edges to see exactly which URLs are being co-shared and with whom.
+- `mcp__skywatch-mcp__cosharing_evolution` with `cluster_id` — If a cluster is found, trace its history to understand when the coordination started and how the network has evolved.
+- `mcp__skywatch-mcp__ozone_query_statuses` with tags — Check if linked accounts share Ozone tags (e.g., same campaign tag applied by a prior reviewer). Shared tags from prior reviews are a strong linkage signal.
 
 **Signals to Document:**
 - Content overlap (exact matches vs. paraphrased)
@@ -184,15 +171,14 @@ Understand how the network's content spreads and what it targets. This phase rev
 
 **Tool Guidance:**
 
-Dispatch a Sonnet subagent for ClickHouse queries:
+Dispatch the `data-analyst` subagent for ClickHouse queries:
 
 - Subagent: "Aggregate engagement patterns for these DIDs [list] — track content through reply trees, repost chains, quote posts"
 - Subagent: "Query quote_overdispersion_results for quoted_author_did IN [network DIDs]. Which posts from the network are receiving anomalous quote amplification? Return quoted_uri, total_shares, unique_sharers, volume_p_value"
 - Subagent: "Query url_overdispersion_results for domains shared by the network. Are any domains being pushed at anomalous rates? Cross-reference sample_dids with network DIDs."
-- `url_expand` — Resolve shortened URLs and link redirects to understand traffic targeting
-- Subagent: "Hydrate these AT-URIs from osprey_execution_results — return content text, rule matches, and timestamps for: [list of AT-URIs]"
-- Fallback: If ClickHouse has no data for these URIs (outside indexing window), use Slingshot `getRecordByUri` to hydrate the post records
-- `ozone_query_statuses` — Check if amplification targets have already been reported or labelled
+- `mcp__skywatch-mcp__url_expand` — Resolve shortened URLs and link redirects to understand traffic targeting
+- Slingshot `getRecordByUri` — Hydrate the most-amplified AT-URIs into full post records for content analysis
+- `mcp__skywatch-mcp__ozone_query_statuses` — Check if amplification targets have already been reported or labelled
 
 **Signals to Document:**
 - Most-amplified content themes
@@ -220,7 +206,7 @@ Test whether existing rules catch the identified network. This phase reveals det
 
 **Tool Guidance:**
 
-Dispatch a Sonnet subagent for ClickHouse queries:
+Dispatch the `data-analyst` subagent for ClickHouse queries:
 
 - Subagent: "Aggregate rule hits for DIDs [list] by account and rule type. Compare hit distribution before and after [date] to assess detection coverage."
 
@@ -244,17 +230,17 @@ Synthesise all findings into a structured, actionable report. This phase produce
 **Actions:**
 - Select appropriate report type (memo, cluster deep-dive, cross-cluster, rule check)
 - Structure findings using the BLIND format (see `reporting-results` skill)
-- Apply labels via `ozone_label` if the investigation warrants enforcement action
-- Apply tags via `ozone_tag` to link accounts to the investigation (e.g., campaign name tags)
-- Add investigator notes via `ozone_comment` for accounts that need ongoing monitoring
+- Apply labels via `mcp__skywatch-mcp__ozone_label` if the investigation warrants enforcement action
+- Apply tags via `mcp__skywatch-mcp__ozone_tag` to link accounts to the investigation (e.g., campaign name tags)
+- Add investigator notes via `mcp__skywatch-mcp__ozone_comment` for accounts that need ongoing monitoring
 - Store the report in the investigation directory using the naming convention
 
 **Tool Guidance:**
 - Consult `reporting-results` skill for formatting requirements
-- `ozone_label` — Apply moderation labels if warranted
-- `ozone_tag` — Tag investigated accounts with the case name for future correlation
-- `ozone_comment` — Add context notes that future reviewers will see when the account surfaces again
-- `ozone_escalate` — Escalate accounts that meet the escalation criteria above
+- `mcp__skywatch-mcp__ozone_label` — Apply moderation labels if warranted
+- `mcp__skywatch-mcp__ozone_tag` — Tag investigated accounts with the case name for future correlation
+- `mcp__skywatch-mcp__ozone_comment` — Add context notes that future reviewers will see when the account surfaces again
+- `mcp__skywatch-mcp__ozone_escalate` — Escalate accounts that meet the escalation criteria above
 
 **Output:**
 - Formatted investigation report ready for review or distribution

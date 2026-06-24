@@ -65,6 +65,9 @@ Examples:
 - "Show posting patterns (frequency, timestamps) for these accounts over the past 30 days"
 - "Find accounts with similar content patterns to this text"
 
+### Data Source Priority for Post/Profile Content
+When you need post content, profile data, or need to hydrate AT-URIs, always dispatch to data-analyst for a ClickHouse query first. ClickHouse data includes rule match context that external sources lack. Only fall back to Slingshot or PDSX tools when ClickHouse has no data (post outside the ~2 month indexing window, taken-down account, or collection browsing).
+
 ### Recon Tools (Use Directly)
 You have direct access to these MCP tools. Use them when you need infrastructure data:
 

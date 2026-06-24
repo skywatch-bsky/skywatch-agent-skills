@@ -1,12 +1,10 @@
 ---
-name: assess-account
 description: >-
   Structured account assessment for AT Protocol investigations. Replaces manual
   account profiling by defining data collection questions, classification schema,
   and output format. Produces account_type, confidence, signals, and recommendation.
   Use when profiling an account of interest during Phase 2 (Characterization) or
   as a standalone quick assessment.
-user-invocable: false
 ---
 
 # Assess Account
@@ -25,7 +23,7 @@ ClickHouse (`osprey_execution_results`) retains approximately 2 months of data. 
 
 ## Phase 1: Data Collection
 
-Dispatch each of the following research questions to the data-analyst agent. Include the target DID and any relevant time constraints. The data-analyst formulates and executes the queries, returning results as markdown tables.
+Dispatch each of the following research questions to the `data-analyst` subagent. Include the target DID and any relevant time constraints. The data-analyst formulates and executes the queries, returning results as markdown tables.
 
 ### 1. Rule Hit Profile
 
@@ -53,7 +51,7 @@ Dispatch each of the following research questions to the data-analyst agent. Inc
 **Dispatch to data-analyst:**
 "Sample the 50 most recent posts from DID [target_did] from osprey_execution_results (use the content field). Return the post text, timestamp, and any rule that matched. Focus on distinct content — skip exact duplicates."
 
-**Supplement with PDS records:** If ClickHouse returns fewer than 30 distinct posts, also fetch posts directly from the account's PDS using the `list_records` PDSX tool with collection `app.bsky.feed.post` and the target DID as `repo`. Paginate (limit 25, use cursor) to collect at least 50-100 posts. This captures the full account history beyond the ClickHouse ~2 month window.
+**Supplement with PDS records:** If ClickHouse returns fewer than 30 distinct posts, also fetch posts directly from the account's PDS using the `mcp__pdsx__list_records` PDSX tool with collection `app.bsky.feed.post` and the target DID as `repo`. Paginate (limit 25, use cursor) to collect at least 50-100 posts. This captures the full account history beyond the ClickHouse ~2 month window.
 
 Always record how many posts came from each source (ClickHouse vs PDS) in the assessment output. If the account's content is primarily outside the ClickHouse window, the PDS data is the primary evidence — not a fallback.
 
@@ -64,7 +62,7 @@ Always record how many posts came from each source (ClickHouse vs PDS) in the as
 **Dispatch to data-analyst:**
 "Check if DID [target_did] appears in any URL co-sharing clusters. Return cluster IDs, cluster sizes, and evolution types. Also check quote co-sharing clusters (`quote_cosharing_membership` and `quote_cosharing_clusters`)."
 
-Additionally, use the `cosharing_pairs` MCP tool directly to check raw co-sharing edges for the target DID.
+Additionally, use the `mcp__skywatch-mcp__cosharing_pairs` MCP tool directly to check raw co-sharing edges for the target DID.
 
 **What this reveals:** Whether the account participates in coordinated URL or quote sharing networks. Quote co-sharing clusters detect pile-on and brigading via coordinated quoting; URL clusters detect coordinated link pushing.
 
@@ -73,7 +71,7 @@ Additionally, use the `cosharing_pairs` MCP tool directly to check raw co-sharin
 **Dispatch to data-analyst:**
 "Query account metadata for DID [target_did]: account creation date, PDS host, and any signup anomaly flags from pds_signup_anomalies (check if the PDS host appears with anomalous signup rates around the account's creation date)."
 
-Use `domain_check` directly on any unusual PDS hosts identified.
+Use `mcp__skywatch-mcp__domain_check` directly on any unusual PDS hosts identified.
 
 **What this reveals:** Account age, hosting infrastructure, and whether the account was created on a PDS with anomalous signup patterns (mass-registration signal).
 
@@ -86,22 +84,17 @@ Use `domain_check` directly on any unusual PDS hosts identified.
 
 ### 8. Ozone Moderation History
 
-Use `ozone_query_statuses` directly with the target DID to retrieve the account's current moderation status — existing labels, review state, tags, and any open reports.
+Use `mcp__skywatch-mcp__ozone_query_statuses` directly with the target DID to retrieve the account's current moderation status — existing labels, review state, tags, and any open reports.
 
-Use `ozone_query_events` directly with the target DID to retrieve the moderation event log — prior labelling actions, escalations, appeals, comments from previous reviewers.
+Use `mcp__skywatch-mcp__ozone_query_events` directly with the target DID to retrieve the moderation event log — prior labelling actions, escalations, appeals, comments from previous reviewers.
 
 **What this reveals:** Whether the account has prior moderation history, what labels have been applied or removed, whether it's been reviewed before and what the outcome was. An account with repeated label-appeal cycles or multiple prior escalations has a different risk profile than one with no moderation history.
 
 ### 9. Protocol-Level Profile
 
-**Data source priority:** ClickHouse first, then PDS/Slingshot fallback.
+Fetch the account's AT Protocol profile record directly. Use the `mcp__pdsx__describe_repo` PDSX tool (or Slingshot `com.atproto.repo.getRecord` for `app.bsky.actor.profile/self`) to retrieve the current profile — display name, bio, avatar, banner.
 
-**Dispatch to data-analyst:**
-"Fetch profile metadata for DID [target_did] from osprey_execution_results — latest handle, follower_count, post_count, account_age_days, pds_host."
-
-If ClickHouse returns no profile metadata (rare — usually available from rule evaluation records), fall back to the `describe_repo` PDSX tool (or Slingshot `com.atproto.repo.getRecord` for `app.bsky.actor.profile/self`) to retrieve the current profile — display name, bio, avatar, banner.
-
-If the account's handle is a custom domain (not `*.bsky.social`), use `whois_lookup` on the domain to check registration age, registrar, and privacy status.
+If the account's handle is a custom domain (not `*.bsky.social`), use `mcp__skywatch-mcp__whois_lookup` on the domain to check registration age, registrar, and privacy status.
 
 **What this reveals:** Profile presentation, potential impersonation signals (copied bios/avatars), and whether a custom domain handle was recently registered or uses privacy protection (common in coordinated networks).
 
@@ -109,7 +102,7 @@ If the account's handle is a custom domain (not `*.bsky.social`), use `whois_loo
 
 Some queries may return no results (new accounts, accounts with no rule hits, accounts not in entropy results). For non-content queries (entropy, overdispersion, co-sharing), this is expected — proceed with available data and flag gaps in the Classification phase.
 
-However, **missing content data is different.** If ClickHouse returns few or no posts, you MUST fetch content from the PDS via `list_records` before proceeding. An account with minimal ClickHouse data but active posting history on its PDS is not a low-data account — it's an account whose data predates the indexing window. Treat PDS-sourced content with the same evidentiary weight as ClickHouse content (minus the rule-match metadata).
+However, **missing content data is different.** If ClickHouse returns few or no posts, you MUST fetch content from the PDS via `mcp__pdsx__list_records` before proceeding. An account with minimal ClickHouse data but active posting history on its PDS is not a low-data account — it's an account whose data predates the indexing window. Treat PDS-sourced content with the same evidentiary weight as ClickHouse content (minus the rule-match metadata).
 
 An account with minimal data from ALL sources (ClickHouse and PDS) produces a low-confidence assessment, not an error.
 

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "validate-ozone-label-comment",
+    "event": "pre_tool_use",
+    "matcher": "mcp__skywatch-mcp__ozone_label",
+    "handler": {
+      "bash": "node \"${POLYTOKEN_PROJECT_DIR:-.}/.polytoken/hooks/validate-label-comment.js\""
+    }
+  }
+]

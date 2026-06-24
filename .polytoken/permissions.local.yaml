@@ -1,0 +1,14 @@
+version: 2
+allow:
+- tool: web_search
+filesystem:
+  allow:
+  - access:
+    - read
+    path: /home/scarndp/dev{,/**}
+  - access:
+    - read
+    path: ~{,/**}
+  - access:
+    - read
+    path: /home/scarndp{,/**}

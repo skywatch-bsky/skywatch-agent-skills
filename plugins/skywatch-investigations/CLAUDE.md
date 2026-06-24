@@ -63,6 +63,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 - `working-the-queue` evaluates replies in thread context (parent post, account relationship, reporter identity) before classification
 - `working-the-queue` delegates per-subject data collection to subagents to preserve triage agent context window; subagents return recommendations with supporting evidence
 - `working-the-queue` uses ClickHouse as the primary data source (rule hits first, then content) — PDS queries are fallback only; caps initial content fetch to 5 posts per subject (plus thread context for replies); deeper fetching is analyst-triggered, capped at 10 posts per follow-up
+- All post/profile content retrieval follows ClickHouse-first cascade: ClickHouse → Slingshot → PDS direct. Agents never go straight to Slingshot or PDSX without trying ClickHouse first
 - `assess-account` supplements ClickHouse data with PDS record fetching via `list_records` (PDSX) when ClickHouse returns insufficient content — ClickHouse covers ~2 months, not the full account history
 - `assess-account` classifies genuine accounts with sustained policy violations as `policy_violator` (not `genuine`) — authenticity and compliance are independent axes
 - `conducting-investigations` Phase 2 has three branches: coordination → Phase 3, individual policy violator → Phase 6 (enforcement), benign → close. Coordination is not a prerequisite for enforcement action

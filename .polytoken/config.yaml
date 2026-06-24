@@ -1,0 +1,43 @@
+# Polytoken project configuration — skywatch / osprey plugin port.
+#
+# This file ports the MCP servers from plugins/skywatch-investigations/.mcp.json.
+# Skills live in .polytoken/skills/<name>/SKILL.md and subagents in
+# .polytoken/subagents/<name>.md; both are auto-discovered, so they are not
+# listed here.
+#
+# Secrets are intentionally NOT stored in this file. Each stdio MCP server is a
+# child process of the daemon and inherits its environment, so export the
+# required credentials in the shell that launches `polytoken daemon`:
+#
+#   ClickHouse: CLICKHOUSE_HOST CLICKHOUSE_PORT CLICKHOUSE_USER
+#               CLICKHOUSE_PASSWORD CLICKHOUSE_DATABASE
+#   Ozone:      OZONE_HANDLE OZONE_ADMIN_PASSWORD OZONE_DID OZONE_PDS
+#
+# Osprey subagents additionally read OSPREY_RULES_PATH and OSPREY_REPO_PATH.
+
+mcp_servers:
+  skywatch-mcp:
+    transport: stdio
+    command: uvx
+    args:
+      - "--from"
+      - "git+ssh://git@github.com/skywatch-bsky/skywatch-mcp.git"
+      - skywatch-mcp
+
+  pdsx:
+    transport: stdio
+    command: uvx
+    args:
+      - "--from"
+      - "pdsx[mcp]"
+      - pdsx-mcp
+
+  atproto:
+    transport: stdio
+    command: uvx
+    args:
+      - atproto-mcp
+
+  pub-search:
+    transport: http
+    url: https://pub-search-by-zzstoatzz.fastmcp.app/mcp
