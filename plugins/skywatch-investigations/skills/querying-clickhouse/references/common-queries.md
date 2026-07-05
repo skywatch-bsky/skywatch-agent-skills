@@ -2,57 +2,56 @@
 
 This reference provides 20 proven query patterns for investigating rule hits and account behavior on the Osprey platform. Use these as starting points for your own investigations.
 
+`osprey_execution_results` is a wide event table: only `__action_id`, `__timestamp`, `__error_count`, `__atproto_label`, `__entity_label_mutations`, and `__verdicts` are present on every row. There is no generic `did`, `rule_name`, `matched`, `score`, or `content` column — each rule/model has its own dynamic column (e.g. `AltGovHandleRule`, `PostTextCleaned`, `AccountAgeSeconds`). See the `accessing-osprey` skill's `references/osprey-schema.md` for the full reference. Queries below name specific example rule/model columns — swap in the actual column for the rule you're investigating.
+
 ---
 
-## 1. All Rule Hits for a Specific DID
+## 1. All Hits for a Specific Rule on a DID's Follow Target
 
-**Purpose:** Find every rule that matched for a particular account. Use when investigating a specific account's violations.
+**Purpose:** Find every time a specific rule matched, scoped to events involving a particular DID. Use when investigating a specific account's violations for a known rule.
 
 **SQL:**
 ```sql
 SELECT
-  rule_name,
-  created_at,
-  matched,
-  score,
-  content_hash
+  __timestamp,
+  Handle,
+  AltGovHandleRule,
+  __atproto_label
 FROM default.osprey_execution_results
-WHERE did = 'did:plc:xxx...'
-  AND created_at > now() - interval 7 day
-ORDER BY created_at DESC
+WHERE FollowSubjectDid = 'did:plc:xxx...'
+  AND AltGovHandleRule = 1
+  AND __timestamp > now() - interval 7 day
+ORDER BY __timestamp DESC
 LIMIT 100
 ```
 
-**Output:** Rows are ordered newest-first. `matched = true` indicates actual rule matches. `score` shows the severity.
+**Output:** Rows are ordered newest-first, one per matching evaluation.
 
-**Notes:** Replace `did:plc:xxx...` with the target DID. Adjust the time range (7 day) as needed. For very active accounts, reduce the time window to avoid hitting LIMIT.
+**Notes:** Replace `did:plc:xxx...` and `AltGovHandleRule` with the target DID and rule column. Which DID-shaped column applies depends on the event type — `FollowSubjectDid` for follow events; other action types expose their own subject columns. Adjust the time range (7 day) as needed.
 
 ---
 
 ## 2. All Rule Hits for a Specific Handle
 
-**Purpose:** Find all rule hits for an account identified by handle (username). Similar to query 1, but using the human-readable handle.
+**Purpose:** Find rule hits for an account identified by handle. Use `Handle` directly since there's no generic `did` filter across all event types.
 
 **SQL:**
 ```sql
 SELECT
-  rule_name,
-  created_at,
-  matched,
-  score,
-  account_age_days,
-  follower_count,
-  post_count
+  __timestamp,
+  AltGovHandleRule,
+  DigestRepostBotRule,
+  AccountAgeSeconds
 FROM default.osprey_execution_results
-WHERE handle = 'alice.bsky.social'
-  AND created_at > now() - interval 7 day
-ORDER BY created_at DESC
+WHERE Handle = 'alice.bsky.social'
+  AND __timestamp > now() - interval 7 day
+ORDER BY __timestamp DESC
 LIMIT 100
 ```
 
-**Output:** Shows rule hits plus account metadata (age, followers, posts). Metadata helps assess account legitimacy.
+**Output:** Shows named rule columns plus account age. NULL in a rule column means that rule wasn't evaluated for that row's event type — not a miss.
 
-**Notes:** Replace `alice.bsky.social` with the target handle. Handles can change; prefer DID for permanent account tracking.
+**Notes:** Replace `alice.bsky.social` and the rule column list with the ones relevant to your investigation. Handles can change; cross-reference with a DID-bearing column (`FollowSubjectDid`, etc.) where available for permanent tracking.
 
 ---
 
@@ -63,73 +62,69 @@ LIMIT 100
 **SQL:**
 ```sql
 SELECT
-  did,
-  handle,
+  Handle,
   count() as hit_count,
-  max(created_at) as latest_hit
+  max(__timestamp) as latest_hit
 FROM default.osprey_execution_results
-WHERE rule_name = 'spam-bot-pattern'
-  AND matched = true
-  AND created_at > now() - interval 1 day
-GROUP BY did, handle
+WHERE AltGovHandleRule = 1
+  AND __timestamp > now() - interval 1 day
+GROUP BY Handle
 ORDER BY hit_count DESC
 LIMIT 50
 ```
 
 **Output:** Aggregated view of accounts. `hit_count` shows how many times each account triggered the rule. `latest_hit` shows the most recent trigger.
 
-**Notes:** Replace `spam-bot-pattern` with the rule name. Adjust time window (1 day) to match investigation scope.
+**Notes:** Replace `AltGovHandleRule` with the target rule column. Adjust time window (1 day) to match investigation scope.
 
 ---
 
-## 4. Top Offenders by Total Rule Hits
+## 4. Top Offenders Across Multiple Rules
 
-**Purpose:** Identify accounts with the most rule matches across all rules. Useful for finding repeat violators.
+**Purpose:** Identify accounts matching the most rules from a known set. Useful for finding repeat violators. Requires naming the rule columns you care about — there's no single `rule_name` to count distinct over.
 
 **SQL:**
 ```sql
 SELECT
-  did,
-  handle,
-  count() as total_hits,
-  count(DISTINCT rule_name) as unique_rules_triggered,
-  max(created_at) as latest_hit
+  Handle,
+  countIf(AltGovHandleRule = 1) as alt_gov_hits,
+  countIf(DigestRepostBotRule = 1) as digest_bot_hits,
+  countIf(ContainsSlurProfileRule = 1) as slur_hits,
+  max(__timestamp) as latest_hit
 FROM default.osprey_execution_results
-WHERE matched = true
-  AND created_at > now() - interval 7 day
-GROUP BY did, handle
-ORDER BY total_hits DESC
+WHERE (AltGovHandleRule = 1 OR DigestRepostBotRule = 1 OR ContainsSlurProfileRule = 1)
+  AND __timestamp > now() - interval 7 day
+GROUP BY Handle
+ORDER BY alt_gov_hits + digest_bot_hits + slur_hits DESC
 LIMIT 100
 ```
 
-**Output:** Ranked by total rule hits. `unique_rules_triggered` shows diversity of violations (1 rule vs. many rules).
+**Output:** Ranked by combined hits across the named rules. Extend the `countIf`/`OR` list to cover more rules as needed.
 
-**Notes:** Time window defaults to 7 days; adjust for longer-term analysis. High `unique_rules_triggered` suggests systematic abuse.
+**Notes:** Time window defaults to 7 days; adjust for longer-term analysis. List every rule column of interest explicitly — there's no distinct-rule-count shortcut without a `rule_name` column.
 
 ---
 
 ## 5. Rule Hit Volume by Hour (Last 24 Hours)
 
-**Purpose:** Detect activity spikes or temporal patterns. Use when investigating coordinated or bot-like activity.
+**Purpose:** Detect activity spikes or temporal patterns for a specific rule. Use when investigating coordinated or bot-like activity.
 
 **SQL:**
 ```sql
 SELECT
-  toStartOfHour(created_at) as hour,
-  rule_name,
-  count() as hits,
-  count(DISTINCT did) as unique_accounts
+  toStartOfHour(__timestamp) as hour,
+  countIf(AltGovHandleRule = 1) as hits,
+  count(DISTINCT Handle) as unique_accounts
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 day
-  AND matched = true
-GROUP BY hour, rule_name
+WHERE __timestamp > now() - interval 1 day
+GROUP BY hour
 ORDER BY hour DESC
 LIMIT 100
 ```
 
 **Output:** Rows grouped by hour. Shows both total hits and unique accounts per hour, revealing spikes and concentration.
 
-**Notes:** Use `toStartOfDay()` for daily buckets, `toStartOfWeek()` for weekly. Adjust time range as needed.
+**Notes:** Use `toStartOfDay()` for daily buckets, `toStartOfWeek()` for weekly. Swap `AltGovHandleRule` for the rule under investigation.
 
 ---
 
@@ -140,46 +135,45 @@ LIMIT 100
 **SQL:**
 ```sql
 SELECT
-  toStartOfDay(created_at) as day,
-  rule_name,
-  count() as hits,
-  avg(score) as avg_score
+  toStartOfDay(__timestamp) as day,
+  countIf(AltGovHandleRule = 1) as alt_gov_hits,
+  countIf(DigestRepostBotRule = 1) as digest_bot_hits,
+  count() as total_events
 FROM default.osprey_execution_results
-WHERE did = 'did:plc:xxx...'
-  AND created_at > now() - interval 30 day
-GROUP BY day, rule_name
+WHERE Handle = 'alice.bsky.social'
+  AND __timestamp > now() - interval 30 day
+GROUP BY day
 ORDER BY day DESC
 LIMIT 100
 ```
 
 **Output:** Daily aggregation showing when the account was most active and which rules triggered. Patterns suggest activity cycles.
 
-**Notes:** Replace DID. For very active accounts, reduce time range. This query reveals whether activity is consistent or episodic.
+**Notes:** Replace handle and rule columns. For very active accounts, reduce time range. This query reveals whether activity is consistent or episodic.
 
 ---
 
-## 7. Burst Detection (High-Frequency Activity)
+## 7. Burst Detection (High-Frequency Posting)
 
 **Purpose:** Find accounts posting at abnormally high frequency, which suggests bots or coordinated behavior.
 
 **SQL:**
 ```sql
 SELECT
-  did,
-  handle,
-  toStartOfDay(created_at) as day,
-  count() as daily_hits,
-  count(DISTINCT toHour(created_at)) as hours_active
+  Handle,
+  toStartOfDay(__timestamp) as day,
+  count() as daily_posts,
+  count(DISTINCT toHour(__timestamp)) as hours_active
 FROM default.osprey_execution_results
-WHERE event_type = 'post'
-  AND created_at > now() - interval 7 day
-GROUP BY did, handle, day
-HAVING daily_hits > 50
-ORDER BY daily_hits DESC
+WHERE ActionName = 'create_post'
+  AND __timestamp > now() - interval 7 day
+GROUP BY Handle, day
+HAVING daily_posts > 50
+ORDER BY daily_posts DESC
 LIMIT 100
 ```
 
-**Output:** Accounts with >50 hits/day. `hours_active` shows how spread the activity was (1 hour = concentrated burst; 24 hours = sustained).
+**Output:** Accounts with >50 posts/day. `hours_active` shows how spread the activity was (1 hour = concentrated burst; 24 hours = sustained).
 
 **Notes:** Adjust the HAVING threshold (>50) based on network norms. Higher thresholds catch more extreme behavior.
 
@@ -187,52 +181,53 @@ LIMIT 100
 
 ## 8. Content Similarity Search (Copypasta Detection)
 
-**Purpose:** Find posts similar to a target text (copypasta, mass-produced content, etc.). Uses n-gram distance.
+**Purpose:** Find posts similar to a target text (copypasta, mass-produced content, etc.). Uses n-gram distance on `PostTextCleaned`.
 
 **SQL:**
 ```sql
 SELECT
-  did,
-  handle,
-  content,
-  created_at,
-  ngramDistance(content, 'target content phrase') as similarity
+  Handle,
+  PostTextCleaned,
+  __timestamp,
+  ngramDistance(PostTextCleaned, 'target content phrase') as similarity
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 day
-  AND ngramDistance(content, 'target content phrase') < 0.5
+WHERE __timestamp > now() - interval 1 day
+  AND PostTextCleaned IS NOT NULL
+  AND length(PostTextCleaned) > 0
+  AND ngramDistance(PostTextCleaned, 'target content phrase') < 0.5
 ORDER BY similarity ASC
 LIMIT 50
 ```
 
 **Output:** Ranked by similarity (lower = more similar). `similarity` is a score from 0 (identical) to 1 (completely different).
 
-**Notes:** Replace `target content phrase` with actual text. The threshold (<0.5) can be adjusted: 0.3 for near-exact matches, 0.5-0.7 for loose similarity. Time-narrow for performance.
+**Notes:** Replace `target content phrase` with actual text. The threshold (<0.5) can be adjusted: 0.3 for near-exact matches, 0.5-0.7 for loose similarity. Always filter `PostTextCleaned IS NOT NULL AND length(PostTextCleaned) > 0` first — most rows have no post text, and `ngramDistance` on NULL/empty is wasted work.
 
 ---
 
 ## 9. Most Common Content Pattern for a Rule
 
-**Purpose:** Identify what content most commonly triggers a rule. Useful for understanding false positives or rule precision.
+**Purpose:** Identify what post text most commonly triggers a rule. Useful for understanding false positives or rule precision.
 
 **SQL:**
 ```sql
 SELECT
-  content,
+  PostTextCleaned,
   count() as occurrences,
-  count(DISTINCT did) as unique_accounts,
-  avg(score) as avg_score
+  count(DISTINCT Handle) as unique_accounts
 FROM default.osprey_execution_results
-WHERE rule_name = 'hate-speech-detector'
-  AND matched = true
-  AND created_at > now() - interval 7 day
-GROUP BY content
+WHERE SuicidalContentRule = 1
+  AND PostTextCleaned IS NOT NULL
+  AND length(PostTextCleaned) > 0
+  AND __timestamp > now() - interval 7 day
+GROUP BY PostTextCleaned
 ORDER BY occurrences DESC
 LIMIT 50
 ```
 
 **Output:** Content ranked by frequency. Shows exact text strings and how many accounts posted them.
 
-**Notes:** Replace rule name. For high-frequency content (retweets, etc.), this reveals coordinated behavior. For low-frequency, helps identify novel patterns.
+**Notes:** Replace `SuicidalContentRule` with the rule column of interest. For high-frequency content (retweets, etc.), this reveals coordinated behavior. For low-frequency, helps identify novel patterns.
 
 ---
 
@@ -243,49 +238,44 @@ LIMIT 50
 **SQL:**
 ```sql
 SELECT
-  rule_name,
-  content,
-  count() as count,
-  count(DISTINCT did) as unique_accounts
+  PostTextCleaned,
+  count() as occurrences,
+  count(DISTINCT Handle) as unique_accounts
 FROM default.osprey_execution_results
-WHERE rule_name = 'spam-promotion'
-  AND matched = true
-  AND created_at > now() - interval 1 day
-  AND length(content) > 50
-GROUP BY rule_name, content
-HAVING count > 2
-ORDER BY count DESC
+WHERE PostTextCleaned IS NOT NULL
+  AND length(PostTextCleaned) > 50
+  AND __timestamp > now() - interval 1 day
+GROUP BY PostTextCleaned
+HAVING occurrences > 2
+ORDER BY occurrences DESC
 LIMIT 100
 ```
 
 **Output:** Grouped by exact content. HAVING filter (>2 occurrences) shows duplicated/clustered messages only.
 
-**Notes:** Adjust `length(content) > 50` to filter by message length. Small HAVING thresholds (>1) reveal even minor duplication.
+**Notes:** Adjust `length(PostTextCleaned) > 50` to filter by message length. Small HAVING thresholds (>1) reveal even minor duplication. For fuzzy (not exact) clustering, use the `content_similarity` MCP tool or `ngramDistance()` pairwise instead of exact GROUP BY.
 
 ---
 
-## 11. Accounts Sharing the Same PDS Host
+## 11. Accounts on a Monitored PDS Host
 
-**Purpose:** Identify accounts on the same Personal Data Server. Can reveal coordinated networks (same provider used for bot armies).
+**Purpose:** Identify accounts on monitored Personal Data Servers. Can reveal coordinated networks (same provider used for bot armies).
 
 **SQL:**
 ```sql
 SELECT
-  pds_host,
-  count(DISTINCT did) as unique_accounts,
-  count() as total_hits,
-  avg(account_age_days) as avg_age_days
+  count(DISTINCT Handle) as unique_accounts,
+  count() as total_events,
+  avg(AccountAgeSeconds) as avg_age_seconds
 FROM default.osprey_execution_results
-WHERE matched = true
-  AND created_at > now() - interval 7 day
-GROUP BY pds_host
-ORDER BY unique_accounts DESC
+WHERE IsMonitoredPdsHost = 1
+  AND __timestamp > now() - interval 7 day
 LIMIT 50
 ```
 
-**Output:** Ranked by account count per host. `avg_age_days` shows if this host is favoured by new accounts (indicator of bot networks).
+**Output:** Aggregate view of activity on monitored PDS hosts. `avg_age_seconds` shows if this cohort skews toward new accounts (indicator of bot networks).
 
-**Notes:** PDS hosts like `bsky.social`, `mostr.pub`, etc. High concentrations on non-mainstream hosts are suspicious.
+**Notes:** `IsMonitoredPdsHost` is a boolean flag, not a hostname — there's no generic `pds_host` string column on this table. For actual hostnames, check the account/domain lookup tools rather than this table.
 
 ---
 
@@ -296,12 +286,12 @@ LIMIT 50
 **SQL:**
 ```sql
 SELECT
-  toStartOfDay(created_at) as day,
-  count(DISTINCT did) as new_accounts_triggered,
-  count() as rule_hits
+  toStartOfDay(__timestamp) as day,
+  count(DISTINCT Handle) as new_accounts_triggered,
+  countIf(AltGovHandleRule = 1) as rule_hits
 FROM default.osprey_execution_results
-WHERE account_age_days < 7
-  AND created_at > now() - interval 30 day
+WHERE AccountAgeSeconds < 7 * 86400
+  AND __timestamp > now() - interval 30 day
 GROUP BY day
 ORDER BY new_accounts_triggered DESC
 LIMIT 50
@@ -309,92 +299,81 @@ LIMIT 50
 
 **Output:** Days when new accounts triggered rules. Spikes indicate coordinated creation campaigns or waves of bot activity.
 
-**Notes:** Adjust `account_age_days < 7` to control age window (e.g., `< 1` for accounts created today). High spikes of new accounts triggering rules in the same day suggest coordinated activity.
+**Notes:** Adjust `AccountAgeSeconds < 7 * 86400` to control age window (e.g., `< 86400` for accounts created today). `AccountAgeSeconds` is seconds, not days. High spikes of new accounts triggering rules in the same day suggest coordinated activity.
 
 ---
 
-## 13. Cross-Signal Correlation (Same Content + PDS + Time)
+## 13. Cross-Signal Correlation (Same Content + Time)
 
-**Purpose:** Identify highly coordinated activity by correlating multiple signals: same content, same PDS, similar timestamps.
+**Purpose:** Identify highly coordinated activity by correlating multiple signals: same post text, similar timestamps.
 
 **SQL:**
 ```sql
 SELECT
-  content_hash,
-  pds_host,
-  toStartOfHour(created_at) as hour,
-  count(DISTINCT did) as unique_accounts,
+  PostTextCleaned,
+  toStartOfHour(__timestamp) as hour,
+  count(DISTINCT Handle) as unique_accounts,
   count() as total_hits
 FROM default.osprey_execution_results
-WHERE content_hash IS NOT NULL
-  AND created_at > now() - interval 1 day
-  AND matched = true
-GROUP BY content_hash, pds_host, hour
+WHERE PostTextCleaned IS NOT NULL
+  AND length(PostTextCleaned) > 0
+  AND __timestamp > now() - interval 1 day
+GROUP BY PostTextCleaned, hour
 HAVING unique_accounts > 3
 ORDER BY unique_accounts DESC
 LIMIT 100
 ```
 
-**Output:** Clusters of identical or very similar content from the same PDS in the same hour window.
+**Output:** Clusters of identical content posted by multiple accounts in the same hour window.
 
-**Notes:** HAVING filter (>3 accounts) identifies suspicious coordination. Adjust threshold to sensitivity.
+**Notes:** HAVING filter (>3 accounts) identifies suspicious coordination. Adjust threshold to sensitivity. There's no `content_hash` or `pds_host` column on this table — use the `cosharing_*` tools/tables for infrastructure-level correlation instead.
 
 ---
 
-## 14. Hit Rate and Coverage per Rule
+## 14. Hit Rate for a Specific Rule
 
-**Purpose:** Understand how often each rule fires and how much of the network it covers. Informs rule tuning and prioritization.
+**Purpose:** Understand how often a rule fires and how much of the network it covers. Informs rule tuning and prioritization. Run once per rule of interest — there's no `rule_name` to GROUP BY.
 
 **SQL:**
 ```sql
 SELECT
-  rule_name,
   count() as total_evaluations,
-  countIf(matched = true) as matches,
-  round(100.0 * countIf(matched = true) / count(), 2) as match_rate,
-  count(DISTINCT did) as unique_accounts_hit,
-  avg(score) as avg_score
+  countIf(AltGovHandleRule = 1) as matches,
+  round(100.0 * countIf(AltGovHandleRule = 1) / countIf(AltGovHandleRule IS NOT NULL), 2) as match_rate,
+  count(DISTINCT Handle) as unique_accounts_hit
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
-GROUP BY rule_name
-ORDER BY match_rate DESC
-LIMIT 50
+WHERE __timestamp > now() - interval 7 day
+LIMIT 1
 ```
 
-**Output:** Rules ranked by match rate (%). Shows how selective each rule is and how many accounts it affects.
+**Output:** A single row with the rule's match rate (%) and account coverage.
 
-**Notes:** Rules with high match rates (20%+) may be too permissive. Rules with very low rates (<1%) may be too strict.
+**Notes:** Replace `AltGovHandleRule` with the rule column. Rules with high match rates (20%+) may be too permissive. Rules with very low rates (<1%) may be too strict. `countIf(... IS NOT NULL)` is the denominator of rows where the rule was actually evaluated (not NULL because the event type didn't apply).
 
 ---
 
 ## 15. False Positive Candidates (Rule Hits on Established Accounts)
 
-**Purpose:** Identify accounts that are old and established (high follower count, many posts) but still trigger rules. These are likely false positives.
+**Purpose:** Identify accounts that are old and established but still trigger rules. These are likely false positives.
 
 **SQL:**
 ```sql
 SELECT
-  did,
-  handle,
-  rule_name,
-  account_age_days,
-  follower_count,
-  post_count,
-  created_at,
-  score
+  Handle,
+  AccountAgeSeconds,
+  __timestamp,
+  AltGovHandleRule
 FROM default.osprey_execution_results
-WHERE matched = true
-  AND account_age_days > 365
-  AND follower_count > 1000
-  AND post_count > 1000
-  AND created_at > now() - interval 7 day
-ORDER BY follower_count DESC
+WHERE AltGovHandleRule = 1
+  AND AccountAgeSeconds > 365 * 86400
+  AND __timestamp > now() - interval 7 day
+ORDER BY AccountAgeSeconds DESC
 LIMIT 100
 ```
 
-**Output:** Rule hits on old, popular accounts. High follower/post counts suggest legitimate users, making rule matches suspicious.
+**Output:** Rule hits on old accounts. High account age suggests a legitimate, established user, making the rule match suspicious.
 
-**Notes:** Adjust thresholds (`account_age_days > 365`, `follower_count > 1000`) based on your network. Results here should be reviewed manually.
+**Notes:** Adjust `AccountAgeSeconds > 365 * 86400` (one year, in seconds) based on your network. There's no `follower_count` or `post_count` column on this table — cross-reference the account directly (e.g. via `assess-account`) for that context. Results here should be reviewed manually.
 
 ---
 
@@ -405,126 +384,117 @@ LIMIT 100
 **SQL:**
 ```sql
 SELECT
-  rule_name,
-  matched,
-  count() as hits,
-  count(DISTINCT did) as unique_accounts,
-  min(created_at) as first_hit,
-  max(created_at) as latest_hit,
-  avg(score) as avg_score,
-  quantile(0.95)(score) as p95_score
+  countIf(NewRuleV1 = 1) as v1_hits,
+  countIf(NewRuleV2 = 1) as v2_hits,
+  count(DISTINCT Handle) as unique_accounts,
+  min(__timestamp) as first_seen,
+  max(__timestamp) as latest_seen
 FROM default.osprey_execution_results
-WHERE rule_name IN ('new-rule-v1', 'new-rule-v2')
-GROUP BY rule_name, matched
-ORDER BY rule_name, matched DESC
-LIMIT 50
+WHERE (NewRuleV1 = 1 OR NewRuleV2 = 1)
+  AND __timestamp > now() - interval 7 day
+LIMIT 1
 ```
 
-**Output:** Coverage stats for new rules. `quantile(0.95)(score)` shows the 95th percentile score (helps tune thresholds).
+**Output:** Coverage stats for named new rules.
 
-**Notes:** Use for monitoring newly deployed rules during their first week. Adjust rule names as needed.
+**Notes:** Use for monitoring newly deployed rules during their first week. Replace `NewRuleV1`/`NewRuleV2` with the actual rule column names — check `clickhouse_schema` if the exact column name is uncertain, since new rule columns are added automatically on deploy.
 
 ---
 
-## 17. Rule Sensitivity Analysis (Score Distribution)
+## 17. Model Score Distribution
 
-**Purpose:** Analyze the distribution of scores for a rule to inform threshold tuning.
+**Purpose:** Analyze the distribution of a numeric model's output to inform threshold tuning.
 
 **SQL:**
 ```sql
 SELECT
-  rule_name,
   count() as total,
-  min(score) as min_score,
-  quantile(0.25)(score) as p25,
-  quantile(0.50)(score) as p50_median,
-  quantile(0.75)(score) as p75,
-  max(score) as max_score,
-  avg(score) as avg_score,
-  stddevPop(score) as std_dev
+  min(ToxicityScoreUnwrapped) as min_score,
+  quantile(0.25)(ToxicityScoreUnwrapped) as p25,
+  quantile(0.50)(ToxicityScoreUnwrapped) as p50_median,
+  quantile(0.75)(ToxicityScoreUnwrapped) as p75,
+  max(ToxicityScoreUnwrapped) as max_score,
+  avg(ToxicityScoreUnwrapped) as avg_score,
+  stddevPop(ToxicityScoreUnwrapped) as std_dev
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
-GROUP BY rule_name
-LIMIT 100
+WHERE ToxicityScoreUnwrapped IS NOT NULL
+  AND __timestamp > now() - interval 7 day
+LIMIT 1
 ```
 
-**Output:** Score distribution (quartiles, mean, std dev). Helps identify whether scores cluster or spread widely.
+**Output:** Score distribution (quartiles, mean, std dev) for the named model column. Helps identify whether scores cluster or spread widely.
 
-**Notes:** Rules with bimodal distributions (gaps in quartiles) may have two distinct populations (true positives vs. false positives).
+**Notes:** Replace `ToxicityScoreUnwrapped` with the numeric model column under investigation. A bimodal distribution (gaps in quartiles) may indicate two distinct populations (true positives vs. false positives).
 
 ---
 
-## 18. Event Type Distribution (Content Types Evaluated)
+## 18. Action Type Distribution (Event Types Evaluated)
 
-**Purpose:** Understand what types of content the Osprey platform evaluates. Useful for rule scope validation.
+**Purpose:** Understand what types of AT Protocol actions the Osprey platform evaluates. Useful for rule scope validation.
 
 **SQL:**
 ```sql
 SELECT
-  event_type,
-  rule_category,
+  ActionName,
   count() as evaluations,
-  countIf(matched = true) as matches,
-  count(DISTINCT rule_name) as unique_rules
+  countIf(AltGovHandleRule = 1) as alt_gov_matches
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
-GROUP BY event_type, rule_category
+WHERE __timestamp > now() - interval 7 day
+GROUP BY ActionName
 ORDER BY evaluations DESC
 LIMIT 50
 ```
 
-**Output:** Breakdown of evaluated content types (post, profile, follow, etc.) and which rule categories match them.
+**Output:** Breakdown of evaluated action types (`create_post`, `create_follow`, `update_profile`, etc.) and how a given rule matches within each.
 
-**Notes:** Helps confirm that rules are being applied to the intended content types.
+**Notes:** Helps confirm that rules are being applied to the intended event types. Swap `AltGovHandleRule` for the rule under review, or drop the `countIf` to just see raw action-type volume.
 
 ---
 
-## 19. Recent Query Diagnostics (Last 100 Evaluations)
+## 19. Recent Evaluation Diagnostics (Last Hour)
 
-**Purpose:** Quick diagnostic to spot unusual recent activity or rule behavior anomalies.
+**Purpose:** Quick diagnostic to spot unusual recent activity or confirm data is flowing.
 
 **SQL:**
 ```sql
 SELECT
-  created_at,
-  rule_name,
-  did,
-  handle,
-  matched,
-  score,
-  event_type
+  __timestamp,
+  __action_id,
+  ActionName,
+  Handle,
+  __atproto_label,
+  __verdicts
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 hour
-ORDER BY created_at DESC
+WHERE __timestamp > now() - interval 1 hour
+ORDER BY __timestamp DESC
 LIMIT 100
 ```
 
-**Output:** Raw recent evaluations. Use for real-time monitoring and quick sanity checks.
+**Output:** Raw recent evaluations with any labels/verdicts applied. Use for real-time monitoring and quick sanity checks.
 
-**Notes:** Useful for verifying that rules are running and data is flowing. Check if expected rules appear.
+**Notes:** Useful for verifying that the pipeline is running and data is flowing. Add specific rule columns to the SELECT list to check whether expected rules are firing.
 
 ---
 
 ## 20. Query Metadata Completeness Check
 
-**Purpose:** Validate data quality by checking for NULL values in critical columns.
+**Purpose:** Validate that the pipeline is populating system columns correctly. There is no `did`/`rule_name`/`matched` to check for NULLs — those never existed as generic columns — so this checks the actual system columns instead.
 
 **SQL:**
 ```sql
 SELECT
-  countIf(created_at IS NULL) as created_at_nulls,
-  countIf(did IS NULL) as did_nulls,
-  countIf(rule_name IS NULL) as rule_name_nulls,
-  countIf(matched IS NULL) as matched_nulls,
+  countIf(__timestamp IS NULL) as timestamp_nulls,
+  countIf(Handle IS NULL) as handle_nulls,
+  countIf(__error_count > 0) as rows_with_errors,
   count() as total_rows
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
+WHERE __timestamp > now() - interval 7 day
 LIMIT 1
 ```
 
-**Output:** NULL value counts per critical column plus total row count. High NULLs indicate data quality issues.
+**Output:** NULL/error counts plus total row count for the window.
 
-**Notes:** Run periodically to monitor data integrity. NULLs in `did`, `rule_name`, or `matched` suggest upstream problems.
+**Notes:** Run periodically to monitor data integrity. `__timestamp` should never be NULL — if it is, that's a pipeline bug. `Handle` NULLs are expected for non-account-centric events (e.g. some system evaluations) but a sudden spike is worth investigating. `__error_count > 0` flags rows where the rule engine itself errored during evaluation.
 
 ---
 
@@ -786,7 +756,7 @@ LIMIT 100
 
 These queries are templates. Adapt them by:
 
-1. **Replacing filter values**: DID, handle, rule name, time ranges
+1. **Replacing filter values**: DID/handle, rule or model column name, time ranges
 2. **Adjusting aggregation levels**: Use `GROUP BY` to slice data different ways
 3. **Changing time windows**: `now() - interval 1 day` to `7 day`, `30 day`, etc.
 4. **Adding filters**: Combine multiple WHERE conditions for more specific investigations

@@ -48,10 +48,13 @@ Key investigation tables:
 ```sql
 -- All valid
 SELECT * FROM default.osprey_execution_results WHERE ... LIMIT 100
-SELECT a.did, b.cluster_id FROM default.osprey_execution_results a
-  JOIN default.url_cosharing_membership b ON a.did = b.did LIMIT 50
-WITH flagged AS (SELECT did FROM default.account_entropy_results WHERE is_bot_like = 1)
-  SELECT * FROM default.osprey_execution_results WHERE did IN (SELECT did FROM flagged) LIMIT 100
+SELECT a.Handle, a.AltGovHandleRule, b.cluster_id
+FROM default.osprey_execution_results a
+  JOIN default.url_cosharing_membership b ON a.FollowSubjectDid = b.did
+LIMIT 50
+WITH flagged AS (SELECT user_id FROM default.account_entropy_results WHERE is_bot_like = 1)
+  SELECT Handle, AccountAgeSeconds FROM default.osprey_execution_results
+  WHERE FollowSubjectDid IN (SELECT user_id FROM flagged) LIMIT 100
 
 -- Rejected
 INSERT INTO ...
@@ -67,19 +70,47 @@ Queries running longer than 60 seconds are automatically cancelled. This encoura
 
 These constraints are enforced at the MCP layer *before* queries reach ClickHouse, so policy violations are caught early.
 
+## Schema Shape: Wide Event Table, Not Flat Columns
+
+`osprey_execution_results` is a **wide event table**, not a flat `rule_name`/`did`/`handle`/`content`/`matched`/`score` table. Each row is one evaluated AT Protocol event (post, follow, profile update, etc.). There is no generic `did`, `handle`, `content`, `created_at`, `rule_name`, `matched`, or `score` column — those concepts are encoded as ~600+ individual dynamic columns, one per rule or model, added automatically as new rules deploy.
+
+Only 6 system columns are present on every row (all prefixed `__`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `__action_id` | Int64 | Unique identifier for the evaluation event |
+| `__timestamp` | DateTime64(3) | UTC timestamp of evaluation — the primary time column |
+| `__error_count` | Nullable(Int32) | Errors during evaluation |
+| `__atproto_label` | Array(String) | Labels applied as a result of this evaluation |
+| `__entity_label_mutations` | Array(String) | Label changes applied to the entity |
+| `__verdicts` | Array(String) | Verdict strings emitted by rules |
+
+Everything else — account identity, post text, rule outcomes, follower counts — lives in dynamic PascalCase columns like `Handle`, `PostTextCleaned`, `AccountAgeSeconds`, `AltGovHandleRule`. See the `accessing-osprey` skill's `references/osprey-schema.md` for the full column reference, naming conventions, and type patterns. Use `clickhouse_schema` or `SELECT name, type FROM system.columns WHERE table = 'osprey_execution_results'` to get the live list — it grows continuously.
+
+**Common columns used in this doc's query patterns:**
+
+| Column | Type | Use Case |
+|--------|------|----------|
+| `__timestamp` | DateTime64(3) | Filter by date range (always include for performance) |
+| `Handle` | Nullable(String) | Account handle |
+| `PostTextCleaned` | Nullable(String) | Cleaned post text — use with `ngramDistance()` |
+| `AccountAgeSeconds` | Nullable(Int64) | Account age at evaluation time |
+| `ActionName` | Nullable(String) | Event type (`create_post`, `create_follow`, `update_profile`, etc.) |
+| `<RuleName>Rule` | Nullable(UInt8) | 1 if that specific rule matched, else 0/NULL |
+
 ## Query Structure Best Practices
 
 Follow this pattern for reliable, performant queries:
 
-### 1. Filter by Time Range First
+### 1. Filter by `__timestamp` First
 
-ClickHouse tables are time-partitioned. Always include a `created_at` filter to dramatically improve performance.
+ClickHouse tables are time-partitioned on `__timestamp`. Always include a `__timestamp` filter to dramatically improve performance.
 
 ```sql
-SELECT rule_name, count() as hits
+SELECT __timestamp, Handle, AltGovHandleRule
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
-GROUP BY rule_name
+WHERE AltGovHandleRule = 1
+  AND __timestamp > now() - interval 7 day
 LIMIT 100
 ```
 
@@ -87,19 +118,19 @@ Without time filtering, queries may scan the entire table and timeout.
 
 ### 2. Select Specific Columns
 
-Avoid `SELECT *`. ClickHouse is column-oriented, so selecting only needed columns significantly improves query speed.
+Avoid `SELECT *`. With 600+ dynamic columns, ClickHouse's columnar storage makes selecting only needed columns dramatically faster.
 
 ```sql
 -- Good (fast)
-SELECT did, handle, rule_name, created_at
+SELECT Handle, AltGovHandleRule, __timestamp
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 day
+WHERE __timestamp > now() - interval 1 day
 LIMIT 100
 
--- Bad (slow)
+-- Bad (very slow, 600+ columns)
 SELECT *
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 day
+WHERE __timestamp > now() - interval 1 day
 LIMIT 100
 ```
 
@@ -117,20 +148,15 @@ SELECT ...
 LIMIT 10000
 ```
 
-### 4. Filter Indexed Columns When Possible
+### 4. Query Specific Rule/Model Columns Directly
 
-The following columns are indexed and filter efficiently:
-- `created_at` — Timestamp (most important)
-- `did` — Account DID
-- `handle` — Account handle
-- `rule_name` — Rule name
-
-Use these in WHERE clauses whenever possible.
+There is no `rule_name` column to filter on — each rule is its own column. Reference the rule or model column by name in the WHERE clause.
 
 ```sql
-SELECT did, handle, rule_name, score, created_at FROM default.osprey_execution_results
-WHERE rule_name = 'spam-bot-pattern'
-  AND created_at > now() - interval 1 day
+SELECT __timestamp, Handle, AccountAgeSeconds
+FROM default.osprey_execution_results
+WHERE AltGovHandleRule = 1
+  AND __timestamp > now() - interval 1 day
 LIMIT 100
 ```
 
@@ -138,22 +164,24 @@ LIMIT 100
 
 ### Content Search Is Expensive
 
-The `ngramDistance()` function searches for similar text by n-gram comparison. It's powerful but slow. Note: ngramDistance() returns 0 for identical content and 1 for completely different content.
+The `ngramDistance()` function searches for similar text by n-gram comparison. It's powerful but slow, and only meaningful on `PostTextCleaned` (not every row has post text — filter out NULL/empty first). Note: ngramDistance() returns 0 for identical content and 1 for completely different content.
 
 Always pair `ngramDistance()` with other filters:
 
 ```sql
--- Good: narrow context with time + ngramDistance
-SELECT did, handle, content
+-- Good: narrow context with time + null-check + ngramDistance
+SELECT Handle, PostTextCleaned, __timestamp
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 1 day
-  AND ngramDistance(content, 'target phrase') < 0.5
-ORDER BY ngramDistance(content, 'target phrase') ASC
+WHERE __timestamp > now() - interval 1 day
+  AND PostTextCleaned IS NOT NULL
+  AND length(PostTextCleaned) > 0
+  AND ngramDistance(PostTextCleaned, 'target phrase') < 0.5
+ORDER BY ngramDistance(PostTextCleaned, 'target phrase') ASC
 LIMIT 50
 
--- Bad: ngramDistance alone scans all content
+-- Bad: ngramDistance alone scans all rows including NULLs
 SELECT ...
-WHERE ngramDistance(content, 'target phrase') < 0.5
+WHERE ngramDistance(PostTextCleaned, 'target phrase') < 0.5
 LIMIT 100
 ```
 
@@ -163,24 +191,25 @@ GROUP BY queries are typically faster than raw row selection, because aggregatio
 
 ```sql
 -- Fast: aggregates reduce data volume
-SELECT rule_name, count() as hits, avg(score) as avg_score
+SELECT toDate(__timestamp) as day, countIf(AltGovHandleRule = 1) as hits
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
-GROUP BY rule_name
+WHERE __timestamp > now() - interval 7 day
+GROUP BY day
 LIMIT 50
 
 -- Slower: full row enumeration
-SELECT rule_name, score
+SELECT __timestamp, AltGovHandleRule
 FROM default.osprey_execution_results
-WHERE created_at > now() - interval 7 day
+WHERE __timestamp > now() - interval 7 day
 LIMIT 1000
 ```
 
 ### Avoid Expensive Operations
 
 - **String concatenation** in WHERE clauses
-- **Function calls** on large datasets (e.g., `LOWER(content)` for every row)
+- **Function calls** on large datasets (e.g., `LOWER(PostTextCleaned)` for every row)
 - **Subqueries** (use JOIN patterns instead if possible, though joins are limited to the same table)
+- **`SELECT \*`** — with 600+ columns this is dramatically more expensive here than on a normal table
 
 ## Common Query Patterns Overview
 
@@ -216,12 +245,12 @@ See `references/common-queries.md` for patterns:
 
 ### Infrastructure Queries
 
-Correlate accounts by shared infrastructure: PDS host, account creation time, etc.
+Correlate accounts by shared infrastructure or timing: monitored PDS hosts, new-account rule triggers, cross-signal timing correlation.
 
 See `references/common-queries.md` for patterns:
-- Accounts sharing a PDS host
-- Accounts created in the same time window
-- Cross-signal correlation
+- Accounts on a monitored PDS host
+- New account rule triggers by day
+- Cross-signal correlation (same content + time)
 
 ### Rule Performance Queries
 
@@ -329,53 +358,42 @@ LIMIT 50
 
 ## Column Quick Reference
 
-Most-used columns for investigation queries. See `accessing-osprey` skill's schema reference for the complete listing.
+Most-used columns for investigation queries. See `accessing-osprey` skill's `references/osprey-schema.md` for the complete listing — there are ~600+ dynamic columns and growing.
 
 | Column | Type | Use Case |
 |--------|------|----------|
-| `created_at` | DateTime | Filter by date range (always include for performance) |
-| `did` | String | Filter by account DID |
-| `handle` | String | Filter by account handle |
-| `rule_name` | String | Filter by rule name |
-| `matched` | Boolean | Filter for actual matches (true) or non-matches (false) |
-| `score` | Float | Aggregate (avg, max) to analyze rule sensitivity |
-| `content` | String | Text search with ngramDistance() |
-| `content_hash` | String | Deduplication and content matching |
-| `pds_host` | String | Infrastructure correlation |
-| `account_age_days` | Int32 | Filter by account age |
-| `follower_count` | Int64 | Identify established vs. new accounts |
-| `post_count` | Int64 | Identify prolific accounts |
-| `event_type` | String | Filter by content type (post, profile, etc.) |
-| `rule_category` | String | Filter by rule category (spam, abuse, policy, etc.) |
+| `__timestamp` | DateTime64(3) | Filter by date range (always include for performance) |
+| `__action_id` | Int64 | Unique row identifier |
+| `Handle` | Nullable(String) | Filter/select by account handle |
+| `PostTextCleaned` | Nullable(String) | Text search with ngramDistance() |
+| `ActionName` | Nullable(String) | Filter by event type (`create_post`, `create_follow`, `update_profile`, etc.) |
+| `AccountAgeSeconds` | Nullable(Int64) | Filter/aggregate by account age |
+| `FollowSubjectDid` | Nullable(String) | DID of follow target (follow events only) |
+| `<RuleName>Rule` | Nullable(UInt8) | 1 if that specific rule matched, else 0/NULL |
+| `<ModelName>` | Nullable(Float64 / Int64 / String) | Model output (score, count, or string value) |
 
 ## Output Interpretation
 
-### Understanding Matched vs. Score
+### Understanding Rule and Model Columns
 
-Rules can output either a boolean (matched: true/false) or a numeric score (0-1 or rule-specific range).
+There is no single `matched` or `score` column. Each rule/model gets its own column:
 
-**Boolean-output rules:**
-- `matched = true` means the rule fired
-- `matched = false` means it didn't
-- `score` will be 0 or 1
+**Rule columns** (suffixed `Rule`, e.g. `AltGovHandleRule`):
+- `1` means the rule fired for this row
+- `0` or `NULL` means it didn't (NULL means the rule wasn't evaluated for this event)
 
-**Numeric-output rules:**
-- `score` is a continuous value
-- `matched = true` if score exceeded the rule's threshold
-- `matched = false` if score was below threshold
-- Compare scores across accounts to identify degrees of severity
-
-### Confidence Scores
-
-The `confidence` column (0-1) indicates how sure the rule is. High confidence (>0.8) is more reliable.
+**Model columns** (no `Rule` suffix, e.g. `ToxicityScoreUnwrapped`):
+- Numeric columns are continuous scores or counts — compare across rows to gauge severity
+- String columns carry model output values (DID, name, collection, etc.)
+- Downstream rules typically threshold a model's output and expose their own boolean `...Rule` column
 
 ### Interpreting NULL Values
 
-NULL values in columns like `follower_count` or `post_count` indicate data was unavailable at evaluation time (account deleted, suspended, etc.).
+A NULL in a dynamic column almost always means "this rule/model was not evaluated for this event" — not missing or corrupted data. Since a row is one AT Protocol event (post, follow, profile update, etc.), only the rules/models relevant to that event type will be populated; everything else is NULL. This is expected and normal — filter explicitly (`IS NOT NULL`, `= 1`) rather than assuming absence indicates a problem.
 
 ## Next Steps
 
-- Review `references/common-queries.md` for 25 proven query patterns
+- Review `references/common-queries.md` for 30 proven query patterns
 - Start with Account investigation queries to understand your targets
 - Use Temporal queries to identify trends
 - Use Content queries for copypasta and similarity detection
