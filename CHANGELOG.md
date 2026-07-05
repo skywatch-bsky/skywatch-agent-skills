@@ -2,6 +2,15 @@
 
 All notable changes to skywatch-skills plugins are documented here.
 
+## skywatch-investigations 0.24.0
+
+**Added:**
+- `scanning-the-network` skill — proactive network-wide threat scanning over a user-specified time window. Coordinator dispatches three parallel `data-analyst` scans (baseline traffic, rule-hit/incident upticks, co-sharing/entropy), synthesizes cross-signal evidence, and produces a consolidated BLIND-style emerging-threat report. Read-only with explicit consent gates for rule and moderation actions
+- added polytoken support
+
+**Changed:**
+- `investigator` agent: optional-skills routing table now loads `scanning-the-network` at Phase 1 (Discovery) for scans with no specific target accounts
+
 ## skywatch-investigations 0.23.9
 
 **Added:**

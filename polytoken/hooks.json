@@ -1,0 +1,18 @@
+[
+  {
+    "name": "validate-ozone-label-comment",
+    "event": "pre_tool_use",
+    "matcher": "mcp__skywatch-mcp__ozone_label",
+    "handler": {
+      "bash": "node \"${POLYTOKEN_PROJECT_DIR:-$PWD}/.polytoken/hooks/validate-label-comment.js\""
+    }
+  },
+  {
+    "name": "load-env",
+    "event": "pre_tool_use",
+    "matcher": "shell_exec",
+    "handler": {
+      "bash": "bash \"${POLYTOKEN_PROJECT_DIR:-$PWD}/.polytoken/hooks/load-clickhouse-env.sh\""
+    }
+  }
+]

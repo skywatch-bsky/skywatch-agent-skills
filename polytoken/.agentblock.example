@@ -1,0 +1,8 @@
+# .agentblock.example — copy to .agentblock in the target project root
+#
+# Prevent agents and file-inspection tools from reading local credential files.
+# Keep real secrets in secrets/*.env and source them from .envrc with
+# source_env_if_exists.
+
+secrets/
+secrets/**

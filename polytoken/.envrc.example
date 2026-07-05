@@ -1,0 +1,60 @@
+# .envrc.example — Skywatch Polytoken environment template
+#
+# Copy to the project root as .envrc and fill in real values:
+#   cp .envrc.example .envrc
+#   direnv allow .
+#
+# Secrets and machine-local paths belong in local files under secrets/.
+# Copy the examples below into secrets/*.env and never commit real passwords,
+# private keys, tokens, or production service credentials.
+#
+# Current Skywatch skills/subagents run shell commands through:
+#   direnv exec . bash -lc '...'
+# so values must be exported. `set -a` auto-exports assignments until `set +a`.
+
+set -a
+
+## ClickHouse SSH + Docker Access
+# The agent SSHes into the host, then execs clickhouse-client inside Docker.
+# Use the native ClickHouse port for clickhouse-client (usually 9000), not the
+# HTTP port (usually 8123).
+
+CLICKHOUSE_SSH_HOST=your-tailscale-or-server-host
+CLICKHOUSE_SSH_USER=your-ssh-user
+CLICKHOUSE_SSH_PORT=22
+
+CLICKHOUSE_DOCKER_CONTAINER=clickhouse
+CLICKHOUSE_HOST=127.0.0.1
+CLICKHOUSE_PORT=9000
+CLICKHOUSE_USER=default
+CLICKHOUSE_DATABASE=default
+
+# Local/secret ClickHouse values, for example:
+#   CLICKHOUSE_PASSWORD=your-clickhouse-password
+#   CLICKHOUSE_SSH_KEY=/home/you/.ssh/id_ed25519
+source_env_if_exists secrets/clickhouse.env
+
+## Ozone Moderation
+# Used by skywatch-mcp/Ozone operations.
+
+OZONE_HANDLE=your-handle.bsky.social
+OZONE_DID=did:plc:your-did
+OZONE_PDS=your-pds.example.com
+OZONE_SERVICE_URL=https://your-ozone-service.example.com
+
+# Secret Ozone values, for example:
+#   OZONE_ADMIN_PASSWORD=your-ozone-password
+source_env_if_exists secrets/ozone.env
+
+## Osprey Rule Development
+# Local working copies used by the osprey-rule-writer subagent.
+
+OSPREY_RULES_PATH=/path/to/skywatch-osprey-rules
+OSPREY_REPO_PATH=/path/to/skywatch-osprey
+
+## Skywatch Obsidian Vault
+# Root path for report-writing skills and investigation artefacts.
+
+SKYWATCH_VAULT=/path/to/obsidian/skywatch-vault
+
+set +a
