@@ -139,6 +139,8 @@ The MCP server connects directly to a ClickHouse server. Requires:
 - Username and password
 - Network access to the server
 
+Connection details load from the project `.envrc` via direnv (`CLICKHOUSE_PASSWORD` from `secrets/clickhouse.env`); the MCP server inherits them at startup. Do not print secret values.
+
 ### Queryable Tables
 
 | Table | Source | Purpose |

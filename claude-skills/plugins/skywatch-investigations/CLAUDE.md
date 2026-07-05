@@ -81,9 +81,9 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 
 ### Expects
 
-- ClickHouse direct access configured via env vars (`CLICKHOUSE_HOST`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE`)
+- ClickHouse direct access configured via env vars (`CLICKHOUSE_HOST`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE`), loaded from the project `.envrc` via direnv (see `.envrc.example` at the marketplace root)
 - Python 3.12+ and `uv`/`uvx` installed for MCP server
-- Ozone credentials (optional — only for read/write tools): `OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS`
+- Ozone credentials (optional — only for read/write tools): `OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS` — non-secret values in `.envrc`, `OZONE_ADMIN_PASSWORD` in `secrets/ozone.env` loaded via `source_env_if_exists`
 - `.policies/` directory in working directory (optional — for `working-the-queue`): label definitions, enforcement criteria, and policy guidance. May contain a `precedents/` subdirectory with analyst decisions on ambiguous cases
 
 ## Dependencies
@@ -134,7 +134,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 | File | Purpose |
 |------|---------|
 | `.claude-plugin/plugin.json` | Plugin manifest (name, version 0.23.8, metadata) |
-| `.mcp.json` | MCP server configuration with ClickHouse env vars (Ozone env vars set via shell/settings) |
+| `.mcp.json` | MCP server configuration (ClickHouse and Ozone env vars are inherited from the direnv-loaded environment, not set here) |
 | `agents/investigator.md` | Orchestrator agent, dispatches data-analyst for queries |
 | `agents/data-analyst.md` | ClickHouse query agent, focused on osprey_execution_results |
 | `skills/assess-account/SKILL.md` | Structured account assessment methodology (data collection, classification, output) |
@@ -155,7 +155,7 @@ The MCP server is an external Python (FastMCP) package installed via `uvx` from 
 
 - MCP server is an external package fetched via `uvx` — requires `uv` on PATH and SSH access to `github.com:skywatch-bsky/skywatch-mcp.git`
 - Ozone tools fail gracefully without credentials (clear error message)
-- Ozone env vars (`OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS`) are NOT in `.mcp.json` — set them in `~/.claude/settings.json` or `~/.zshrc` to avoid committing secrets
+- Ozone env vars (`OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS`) are NOT in `.mcp.json` — they load from the project `.envrc` via direnv; `OZONE_ADMIN_PASSWORD` belongs in `secrets/ozone.env` (never committed). Launch `claude` from a directory where the `.envrc` is active so MCP servers inherit the environment
 - Ozone auth goes through the PDS (via `atproto-proxy` header), not directly to the Ozone service URL
 - `content_similarity` depends on ClickHouse — recon tools work independently
 - ip-api.com free tier has 45 req/min rate limit

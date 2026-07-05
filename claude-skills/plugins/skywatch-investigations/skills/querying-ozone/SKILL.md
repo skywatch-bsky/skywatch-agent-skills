@@ -21,7 +21,7 @@ Ozone read queries (queue pulls, event history) and write actions (labelling, ac
 
 ## Credentials
 
-Ozone tools require four environment variables: `OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS`. These are NOT in `.mcp.json` — they must be set in the shell environment or `~/.claude/settings.json`. All tools fail gracefully with a clear error if credentials are missing.
+Ozone tools require four environment variables: `OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS`. These are NOT in `.mcp.json` — they load from the project `.envrc` via direnv. Non-secret values live directly in `.envrc`; `OZONE_ADMIN_PASSWORD` lives in `secrets/ozone.env`, loaded by `.envrc` via `source_env_if_exists`. The MCP server inherits them at startup, so `claude` must be launched from a directory where the `.envrc` is active. All tools fail gracefully with a clear error if credentials are missing; do not print secret values.
 
 Auth goes through the PDS (via `atproto-proxy` header), not directly to the Ozone service. The `ozoneRequest` helper automatically retries on `ExpiredToken` with a session refresh — no manual retry logic needed.
 
@@ -221,7 +221,7 @@ Resolve an appeal on a subject.
 
 ## Gotchas
 
-- **Credentials not in .mcp.json** — set `OZONE_HANDLE`, `OZONE_ADMIN_PASSWORD`, `OZONE_DID`, `OZONE_PDS` in your shell or settings
+- **Credentials not in .mcp.json** — `OZONE_HANDLE`, `OZONE_DID`, `OZONE_PDS` live in the project `.envrc`; `OZONE_ADMIN_PASSWORD` lives in `secrets/ozone.env`, loaded via direnv. If credentials are missing, the operator should update `.envrc`, run `direnv allow .`, and restart Claude Code from that directory
 - **Auth route:** PDS proxy, not direct Ozone connection
 - **cid required for post-level:** If you have an AT-URI but no cid, resolve it first via `com.atproto.repo.getRecord`
 - **Auto-retry on token expiry:** The `ozoneRequest` helper handles `ExpiredToken` automatically — don't add manual retry logic

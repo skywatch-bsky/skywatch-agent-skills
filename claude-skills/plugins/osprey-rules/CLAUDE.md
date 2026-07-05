@@ -61,7 +61,7 @@ The orchestrator routes user intent to the right flow:
 | `OSPREY_RULES_PATH` | Path to the Osprey rules project directory (contains `main.sml`). Skips asking the user. |
 | `OSPREY_REPO_PATH` | Path to the `osprey-for-atproto` repository (contains `osprey_worker/`). Skips asking the user. |
 
-Set these in `~/.claude/settings.json` under `env` or export them in your shell profile. If unset, agents will ask via `AskUserQuestion` on first invocation.
+Set these in the project `.envrc` loaded by direnv (see `.envrc.example` at the marketplace root) and run `direnv allow .`. If unset, agents will ask via `AskUserQuestion` on first invocation.
 
 ## Dependencies
 

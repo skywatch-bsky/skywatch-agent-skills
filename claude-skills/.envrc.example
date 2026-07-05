@@ -1,0 +1,46 @@
+# .envrc.example — Skywatch Claude Code plugins environment template
+#
+# Copy to the working directory you launch `claude` from and fill in real values:
+#   cp .envrc.example .envrc
+#   direnv allow .
+#
+# Secrets and machine-local paths belong in local files under secrets/.
+# Copy the examples below into secrets/*.env and never commit real passwords,
+# private keys, tokens, or production service credentials.
+#
+# Claude Code launches plugin MCP servers as child processes, so they inherit
+# the environment direnv loads for this directory. Values must be exported;
+# `set -a` auto-exports assignments until `set +a`.
+
+set -a
+
+## ClickHouse (skywatch-investigations)
+# The skywatch-mcp server connects directly to ClickHouse.
+
+CLICKHOUSE_HOST=your-clickhouse-host
+CLICKHOUSE_PORT=8123
+CLICKHOUSE_USER=default
+CLICKHOUSE_DATABASE=default
+
+# Secret ClickHouse values, for example:
+#   CLICKHOUSE_PASSWORD=your-clickhouse-password
+source_env_if_exists secrets/clickhouse.env
+
+## Ozone Moderation (skywatch-investigations, optional)
+# Required only for Ozone read/write moderation tools.
+
+OZONE_HANDLE=your-handle.bsky.social
+OZONE_DID=did:plc:your-did
+OZONE_PDS=your-pds.example.com
+
+# Secret Ozone values, for example:
+#   OZONE_ADMIN_PASSWORD=your-ozone-password
+source_env_if_exists secrets/ozone.env
+
+## Osprey Rule Development (osprey-rules, optional)
+# Local working copies used by the osprey-rules agents. If unset, agents ask.
+
+OSPREY_RULES_PATH=/path/to/skywatch-osprey-rules
+OSPREY_REPO_PATH=/path/to/osprey-for-atproto
+
+set +a

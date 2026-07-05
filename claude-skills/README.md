@@ -24,9 +24,43 @@ Individual plugins are registered in `.claude-plugin/marketplace.json` and loade
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - [`uv`](https://docs.astral.sh/uv/) on PATH (used by MCP server installation and osprey-cli)
+- [`direnv`](https://direnv.net/) installed and hooked into your shell (loads per-directory environment for the plugins)
 - SSH access to GitHub (for `git+ssh://` MCP dependencies)
 - **osprey-rules**: local clone of `osprey-for-atproto` repo
 - **skywatch-investigations**: ClickHouse credentials; optionally Ozone credentials for moderation write tools
+
+### Environment Setup
+
+Configuration and secrets are loaded per-directory with direnv. In the working directory you launch `claude` from:
+
+```bash
+cp /path/to/claude-skills/.envrc.example .envrc
+
+mkdir -p secrets
+chmod 700 secrets
+```
+
+Edit `.envrc` with non-secret local values. Put secret values in ignored secret files:
+
+```bash
+cat > secrets/clickhouse.env <<'EOF'
+CLICKHOUSE_PASSWORD=your-clickhouse-password
+EOF
+
+cat > secrets/ozone.env <<'EOF'
+OZONE_ADMIN_PASSWORD=your-ozone-password
+EOF
+
+chmod 600 secrets/*.env
+```
+
+Then approve the environment:
+
+```bash
+direnv allow .
+```
+
+`.envrc` keeps non-secret configuration inline and loads local secret files with `source_env_if_exists secrets/*.env`. Claude Code launches plugin MCP servers as child processes, so they inherit whatever direnv loaded for the directory — always start `claude` from a directory where the `.envrc` is active. Never commit a real `.envrc` or `secrets/*.env`.
 
 ---
 
@@ -80,6 +114,8 @@ The entry point agent (`osprey-rule-writer`) dispatches specialized subagents ba
 |----------|----------|---------|
 | `OSPREY_RULES_PATH` | No | Path to the Osprey rules project directory (contains `main.sml`). If unset, the agent asks. |
 | `OSPREY_REPO_PATH` | No | Path to the `osprey-for-atproto` repository. If unset, the agent asks. |
+
+Set these in the project `.envrc` (see [Environment Setup](#environment-setup)). If unset, agents will ask via `AskUserQuestion` on first invocation.
 
 ---
 
@@ -195,7 +231,7 @@ Investigations follow the BLIND report format:
 | `OZONE_DID` | No | Ozone service DID |
 | `OZONE_PDS` | No | PDS URL for Ozone auth proxy |
 
-ClickHouse variables are configured in the plugin's `.mcp.json`. Set Ozone variables in `~/.claude/settings.json` under `env` or export them in your shell profile to avoid committing secrets.
+All variables are loaded from the project `.envrc` via direnv (see [Environment Setup](#environment-setup)). Non-secret values live directly in `.envrc`; `CLICKHOUSE_PASSWORD` belongs in `secrets/clickhouse.env` and `OZONE_ADMIN_PASSWORD` in `secrets/ozone.env`, loaded by `.envrc` via `source_env_if_exists`. The MCP server inherits these at startup, so launch `claude` from the directory where the `.envrc` is active.
 
 ### Policy Directory
 
@@ -220,6 +256,7 @@ The `working-the-queue` skill reads a `.policies/` directory in the current work
 skywatch-skills/
 ├── .claude-plugin/
 │   └── marketplace.json            # Plugin registry
+├── .envrc.example                  # Local environment template; copy to your working directory
 ├── plugins/
 │   ├── osprey-rules/               # v0.3.0
 │   │   ├── .claude-plugin/

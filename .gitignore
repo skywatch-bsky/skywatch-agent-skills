@@ -1,5 +1,8 @@
 # User data and analysis
 .obsidian/**
+.env
+.envrc
+secrets/
 
 # Build output
 **/dist
